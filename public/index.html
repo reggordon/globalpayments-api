@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Payments API - Sandbox</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .required {
+            color: #e74c3c;
+        }
+
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .col {
+            flex: 1;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .test-cards {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3cd;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+
+        .test-cards h3 {
+            color: #856404;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .test-cards ul {
+            list-style: none;
+            color: #856404;
+        }
+
+        .test-cards li {
+            margin-bottom: 5px;
+        }
+
+        .result {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 6px;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .result h3 {
+            margin-bottom: 10px;
+        }
+
+        .result-details {
+            font-size: 14px;
+        }
+
+        .result-details div {
+            margin: 5px 0;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Global Payments API</h1>
+        <p class="subtitle">Direct API Integration - Sandbox</p>
+
+        <div class="info-box">
+            <strong>API Mode:</strong> This application uses direct server-to-server API integration with the Global Payments sandbox environment.
+        </div>
+
+        <form id="paymentForm">
+            <div class="form-group">
+                <label for="amount">Amount <span class="required">*</span></label>
+                <input type="number" id="amount" name="amount" placeholder="10.00" step="0.01" min="0.01" required>
+            </div>
+
+            <div class="form-group">
+                <label for="currency">Currency <span class="required">*</span></label>
+                <select id="currency" name="currency" required>
+                    <option value="EUR">EUR - Euro</option>
+                    <option value="USD">USD - US Dollar</option>
+                    <option value="GBP">GBP - British Pound</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="cardNumber">Card Number <span class="required">*</span></label>
+                <input type="text" id="cardNumber" name="cardNumber" placeholder="4263970000005262" maxlength="16" required>
+            </div>
+
+            <div class="form-group">
+                <label for="cardHolderName">Cardholder Name <span class="required">*</span></label>
+                <input type="text" id="cardHolderName" name="cardHolderName" placeholder="John Doe" required>
+            </div>
+
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label for="expiryMonth">Expiry Month <span class="required">*</span></label>
+                        <select id="expiryMonth" name="expiryMonth" required>
+                            <option value="">MM</option>
+                            <option value="01">01</option>
+                            <option value="02">02</option>
+                            <option value="03">03</option>
+                            <option value="04">04</option>
+                            <option value="05">05</option>
+                            <option value="06">06</option>
+                            <option value="07">07</option>
+                            <option value="08">08</option>
+                            <option value="09">09</option>
+                            <option value="10">10</option>
+                            <option value="11">11</option>
+                            <option value="12">12</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label for="expiryYear">Expiry Year <span class="required">*</span></label>
+                        <select id="expiryYear" name="expiryYear" required>
+                            <option value="">YY</option>
+                            <option value="25">25</option>
+                            <option value="26">26</option>
+                            <option value="27">27</option>
+                            <option value="28">28</option>
+                            <option value="29">29</option>
+                            <option value="30">30</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label for="cvv">CVV <span class="required">*</span></label>
+                        <input type="text" id="cvv" name="cvv" placeholder="123" maxlength="3" required>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" id="submitBtn">Process Payment</button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing payment...</p>
+        </div>
+
+        <div class="result" id="result">
+            <h3 id="resultTitle"></h3>
+            <div class="result-details" id="resultDetails"></div>
+        </div>
+
+        <div class="test-cards">
+            <h3>📝 Test Cards for Sandbox</h3>
+            <ul>
+                <li><strong>Success:</strong> 4263970000005262</li>
+                <li><strong>Declined:</strong> 4000120000001154</li>
+                <li><strong>CVV:</strong> 123 | <strong>Expiry:</strong> Any future date</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('paymentForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const form = e.target;
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            
+            // Hide previous results
+            result.style.display = 'none';
+            
+            // Show loading
+            form.style.display = 'none';
+            loading.style.display = 'block';
+            submitBtn.disabled = true;
+            
+            // Get form data
+            const formData = {
+                amount: document.getElementById('amount').value,
+                currency: document.getElementById('currency').value,
+                cardNumber: document.getElementById('cardNumber').value,
+                cardHolderName: document.getElementById('cardHolderName').value,
+                expiryMonth: document.getElementById('expiryMonth').value,
+                expiryYear: document.getElementById('expiryYear').value,
+                cvv: document.getElementById('cvv').value
+            };
+            
+            try {
+                const response = await fetch('/process-payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                // Hide loading
+                loading.style.display = 'none';
+                
+                // Show result
+                result.style.display = 'block';
+                result.className = 'result ' + (data.success ? 'success' : 'error');
+                
+                document.getElementById('resultTitle').textContent = 
+                    data.success ? '✓ Payment Successful!' : '✗ Payment Failed';
+                
+                let detailsHtml = `
+                    <div><strong>Result Code:</strong> ${data.resultCode}</div>
+                    <div><strong>Message:</strong> ${data.message}</div>
+                    <div><strong>Order ID:</strong> ${data.orderId || 'N/A'}</div>
+                    ${data.authCode ? `<div><strong>Auth Code:</strong> ${data.authCode}</div>` : ''}
+                    ${data.pasRef ? `<div><strong>Payment Reference:</strong> ${data.pasRef}</div>` : ''}
+                `;
+                
+                // Add special message for error 504
+                if (data.resultCode === '504') {
+                    detailsHtml += `
+                        <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 4px; font-size: 13px;">
+                            <strong>⚠️ API Access Required:</strong><br>
+                            Your merchant account is not enabled for API access. 
+                            Contact Global Payments support at <strong>developer@globalpay.com</strong> 
+                            to request API credentials.
+                        </div>
+                    `;
+                }
+                
+                document.getElementById('resultDetails').innerHTML = detailsHtml;
+                
+                // Show form again
+                form.style.display = 'block';
+                submitBtn.disabled = false;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                
+                loading.style.display = 'none';
+                result.style.display = 'block';
+                result.className = 'result error';
+                document.getElementById('resultTitle').textContent = '✗ Error';
+                document.getElementById('resultDetails').innerHTML = 
+                    `<div>Failed to process payment. Please try again.</div>`;
+                
+                form.style.display = 'block';
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Format card number input
+        document.getElementById('cardNumber').addEventListener('input', function(e) {
+            e.target.value = e.target.value.replace(/\D/g, '');
+        });
+
+        // Format CVV input
+        document.getElementById('cvv').addEventListener('input', function(e) {
+            e.target.value = e.target.value.replace(/\D/g, '');
+        });
+    </script>
+</body>
+</html>

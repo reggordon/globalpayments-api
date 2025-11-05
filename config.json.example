@@ -1,0 +1,7 @@
+{
+  "merchantId": "YOUR_API_MERCHANT_ID",
+  "account": "internet",
+  "sharedSecret": "YOUR_API_SHARED_SECRET",
+  "apiUrl": "https://api.sandbox.realexpayments.com/epage-remote.cgi",
+  "note": "API credentials are different from HPP credentials. You need to register for API access separately."
+}
