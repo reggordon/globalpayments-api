@@ -229,13 +229,13 @@ The application sends XML requests to Global Payments:
 |----------|-------------|---------|
 | `PORT` | Server port | `3001` |
 | `NODE_ENV` | Environment mode | `development` or `production` |
-| `API_MERCHANT_ID` | Your Global Payments API merchant ID | `dev791880573356328554` |
-| `API_ACCOUNT` | API sub-account for transactions | `internet` |
-| `API_SHARED_SECRET` | Secret key for API signature generation | `hIAPYfgOhm` |
+| `API_MERCHANT_ID` | Your Global Payments API merchant ID | `your_api_merchant_id` |
+| `API_ACCOUNT` | API sub-account for transactions | `your_account` |
+| `API_SHARED_SECRET` | Secret key for API signature generation | `your_api_secret` |
 | `API_URL` | Global Payments API endpoint | `https://api.sandbox.realexpayments.com/epage-remote.cgi` |
-| `HPP_MERCHANT_ID` | Your Global Payments HPP merchant ID | `regtest` |
-| `HPP_ACCOUNT` | HPP sub-account | `c2p` |
-| `HPP_SHARED_SECRET` | Secret key for HPP signature generation | `2A9wkRXR6W` |
+| `HPP_MERCHANT_ID` | Your Global Payments HPP merchant ID | `your_hpp_merchant_id` |
+| `HPP_ACCOUNT` | HPP sub-account | `your_hpp_account` |
+| `HPP_SHARED_SECRET` | Secret key for HPP signature generation | `your_hpp_secret` |
 | `HPP_SANDBOX_URL` | HPP hosted page URL | `https://pay.sandbox.realexpayments.com/pay` |
 | `HPP_RESPONSE_URL` | URL where HPP redirects after payment | `http://localhost:3001/hpp-response` |
 
