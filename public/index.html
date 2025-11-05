@@ -40,8 +40,34 @@
         .subtitle {
             color: #666;
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             font-size: 14px;
+        }
+
+        .nav-link {
+            text-align: center;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .nav-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 8px 16px;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            display: inline-block;
+            transition: all 0.3s;
+            font-size: 13px;
+        }
+
+        .nav-link a:hover {
+            background: #667eea;
+            color: white;
         }
 
         .form-group {
@@ -200,6 +226,11 @@
     <div class="container">
         <h1>Global Payments API</h1>
         <p class="subtitle">Direct API Integration - Sandbox</p>
+
+        <div class="nav-link">
+            <a href="/dropin.html">🎨 Try Drop-In UI</a>
+            <a href="/transactions.html">📊 View Transaction History</a>
+        </div>
 
         <div class="info-box">
             <strong>API Mode:</strong> This application uses direct server-to-server API integration with the Global Payments sandbox environment.

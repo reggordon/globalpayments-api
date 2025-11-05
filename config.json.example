@@ -3,5 +3,10 @@
   "account": "internet",
   "sharedSecret": "YOUR_API_SHARED_SECRET",
   "apiUrl": "https://api.sandbox.realexpayments.com/epage-remote.cgi",
-  "note": "API credentials are different from HPP credentials. You need to register for API access separately."
+  "hppMerchantId": "YOUR_HPP_MERCHANT_ID",
+  "hppAccount": "YOUR_HPP_ACCOUNT",
+  "hppSharedSecret": "YOUR_HPP_SHARED_SECRET",
+  "hppSandboxUrl": "https://hpp.sandbox.realexpayments.com/pay",
+  "hppResponseUrl": "http://localhost:3001/hpp-response",
+  "note": "API credentials are different from HPP credentials. You may use the same or different merchant accounts."
 }
