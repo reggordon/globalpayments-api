@@ -1,161 +1,121 @@
 # Global Payments API Integration
 
-A Node.js application that provides direct server-to-server API integration with Global Payments sandbox environment. This application processes payments directly through the Global Payments REST API.
+A Node.js application for direct server-to-server integration with Global Payments sandbox environment.
 
-## ⚠️ IMPORTANT NOTICE
+## Quick Start
 
-**This integration requires API-specific credentials that are different from HPP credentials.**
+```bash
+# Install dependencies
+npm install
 
-If you receive error **504 "There is no such merchant id"**, your merchant account is not enabled for API access. You must:
+# Configure environment
+cp .env.example .env
+# Edit .env with your credentials
 
-1. Contact Global Payments support: **developer@globalpay.com**
-2. Request: "Please enable XML/REST API access for my sandbox account"
-3. Wait for API credentials or confirmation that your account is API-enabled
+# Start server
+npm start
+```
 
-**HPP credentials will NOT work with this integration.** They are separate systems with different authentication.
+Open http://localhost:3001
 
 ## Features
 
-- 🔐 Direct API integration with signature generation
-- 💳 Support for multiple currencies (EUR, USD, GBP)
-- 🎨 Clean, modern user interface
-- ✅ Real-time payment processing
-- 📊 Detailed transaction responses
-- 🔒 Secure server-side card processing
+- � Direct API and HPP integration
+- � Secure server-side processing
+- 📊 Transaction history tracking
+- 🎨 Modern, responsive UI
+- 🔄 Refund support
 
-## Differences from HPP Integration
+## Configuration
 
-| Feature | API Integration | HPP Integration |
-|---------|----------------|-----------------|
-| Card Data | Handled on your server | Handled by Global Payments |
-| PCI Compliance | Your responsibility | Global Payments handles it |
-| User Experience | Seamless, no redirect | Redirects to payment page |
-| Control | Full control over UI/UX | Limited customization |
-| Complexity | More complex | Simpler to implement |
+Create a `.env` file with your Global Payments credentials:
 
-## Prerequisites
-
-- Node.js (version 14 or higher)
-- npm or yarn
-- Global Payments sandbox account credentials
-- **PCI DSS compliance** (required for handling card data)
-
-## Installation
-
-1. Navigate to the project directory:
-```bash
-cd /Users/reggordon/github/globalpayments-api
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Configure your environment variables:
-```bash
-cp .env.example .env
-```
-
-4. Edit `.env` and add your Global Payments sandbox credentials:
 ```env
-# Server Configuration
 PORT=3001
 NODE_ENV=development
+LOG_LEVEL=info
 
-# Global Payments API Credentials (Server-to-Server)
-API_MERCHANT_ID=your_api_merchant_id
-API_ACCOUNT=internet
-API_SHARED_SECRET=your_api_shared_secret
+# API Credentials
+API_MERCHANT_ID=your_merchant_id
+API_ACCOUNT=your_account
+API_SHARED_SECRET=your_secret
 API_URL=https://api.sandbox.realexpayments.com/epage-remote.cgi
 
-# Global Payments HPP Credentials (Hosted Payment Page)
+# HPP Credentials
 HPP_MERCHANT_ID=your_hpp_merchant_id
 HPP_ACCOUNT=your_hpp_account
-HPP_SHARED_SECRET=your_hpp_shared_secret
+HPP_SHARED_SECRET=your_hpp_secret
 HPP_SANDBOX_URL=https://pay.sandbox.realexpayments.com/pay
 HPP_RESPONSE_URL=http://localhost:3001/hpp-response
 ```
 
-**⚠️ Never commit the `.env` file to version control!** It contains sensitive credentials.
+⚠️ **Never commit `.env` to version control!**
 
-## Getting Your Sandbox Credentials
+## Test Cards
 
-**⚠️ IMPORTANT: API credentials are different from HPP credentials!**
+| Card Number | Result | CVV |
+|-------------|--------|-----|
+| 4263970000005262 | Success | 123 |
+| 4000120000001154 | Declined | 123 |
 
-To use the API integration, you need to register for API access:
+Expiry: Any future date
 
-1. Sign up for a Global Payments sandbox account at: https://developer.globalpay.com/
-2. **Request API access** - This is separate from HPP access
-3. Once approved, you'll receive:
-   - **API Merchant ID**: Different from your HPP merchant ID
-   - **API Shared Secret**: Different from your HPP shared secret
-   - **Account**: Usually "internet" for API transactions
+## Documentation
 
-**Note:** The same merchant may have different credentials for:
-- **HPP Integration** (Hosted Payment Page)
-- **API Integration** (Direct XML/REST API)
+For detailed documentation, see the [Wiki](./wiki):
 
-If you haven't registered for API access yet, contact Global Payments support to enable API access for your sandbox account.
+- [Installation Guide](./wiki/Installation.md)
+- [API Integration](./wiki/API-Integration.md)
+- [HPP Integration](./wiki/HPP-Integration.md)
+- [Security Best Practices](./wiki/Security.md)
+- [Troubleshooting](./wiki/Troubleshooting.md)
+- [API Response Codes](./wiki/Response-Codes.md)
 
-## Usage
-
-1. Start the server:
-```bash
-npm start
 ```
-
-Or for development with auto-reload:
-```bash
-npm run dev
-```
-
-2. Open your browser and navigate to:
-```
-http://localhost:3001
-```
-
-3. Fill in the payment form:
-   - **Amount**: The payment amount (e.g., 10.00)
-   - **Currency**: Select your preferred currency
-   - **Card Number**: Test card number
-   - **Cardholder Name**: Customer name
-   - **Expiry Date**: Card expiration (MM/YY)
-   - **CVV**: Card security code
-
-4. Click "Process Payment" to submit the transaction
-
-5. Use test cards:
-   - **Success**: 4263970000005262
-   - **Declined**: 4000120000001154
-   - **CVV**: 123
-   - **Expiry**: Any future date
 
 ## Project Structure
 
 ```
 globalpayments-api/
-├── server.js                  # Express server with API integration
-├── package.json               # Node.js dependencies
-├── .env.example              # Example environment variables
-├── .env                      # Your actual credentials (not in git)
-├── public/
-│   ├── index.html            # Direct API payment form
-│   ├── transactions.html     # Transaction history
-│   ├── dropin.html          # HPP Drop-In UI
-│   ├── hpp-result.html      # HPP result page
-│   ├── css/                 # Modular stylesheets
-│   │   ├── main.css
-│   │   ├── transactions.css
-│   │   └── hpp.css
-│   └── js/                  # Modular JavaScript
-│       ├── payment.js
-│       ├── transactions.js
-│       ├── dropin.js
-│       └── hpp-result.js
-├── data/
-│   └── transactions.json    # Transaction log (auto-generated)
-└── README.md                # This file
+├── server.js              # Express server
+├── logger.js              # Winston logging
+├── .env                   # Your credentials (not in git)
+├── public/                # Frontend files
+│   ├── css/              # Stylesheets
+│   └── js/               # Client scripts
+├── data/                  # Transaction storage
+└── logs/                  # Application logs
+```
+
+## Important Notes
+
+### API vs HPP Credentials
+
+**API** and **HPP** use different credentials. If you get error 504 "no such merchant id":
+- You're using HPP credentials for API integration (or vice versa)
+- Contact developer@globalpay.com to request API access
+
+### Security
+
+- ⚠️ **PCI DSS compliance required** for handling card data
+- Use HTTPS in production
+- Never log full card numbers
+- Rotate credentials regularly
+
+## Resources
+
+- [Global Payments Developer Portal](https://developer.globalpay.com/)
+- [API Documentation](https://developer.globalpay.com/#!/api)
+- [Support](mailto:developer@globalpay.com)
+
+## License
+
+MIT
+
+---
+
+⚠️ **Sandbox Only**: This is a demonstration application. Production use requires proper security audit, PCI compliance, and HTTPS implementation.
+
 ```
 
 ## How It Works
