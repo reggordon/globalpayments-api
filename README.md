@@ -52,20 +52,32 @@ cd /Users/reggordon/github/globalpayments-api
 npm install
 ```
 
-3. Configure your credentials:
+3. Configure your environment variables:
 ```bash
-cp config.json.example config.json
+cp .env.example .env
 ```
 
-4. Edit `config.json` and add your Global Payments sandbox credentials:
-```json
-{
-  "merchantId": "YOUR_MERCHANT_ID",
-  "account": "internet",
-  "sharedSecret": "YOUR_SHARED_SECRET",
-  "apiUrl": "https://api.sandbox.realexpayments.com/epage-remote.cgi"
-}
+4. Edit `.env` and add your Global Payments sandbox credentials:
+```env
+# Server Configuration
+PORT=3001
+NODE_ENV=development
+
+# Global Payments API Credentials (Server-to-Server)
+API_MERCHANT_ID=your_api_merchant_id
+API_ACCOUNT=internet
+API_SHARED_SECRET=your_api_shared_secret
+API_URL=https://api.sandbox.realexpayments.com/epage-remote.cgi
+
+# Global Payments HPP Credentials (Hosted Payment Page)
+HPP_MERCHANT_ID=your_hpp_merchant_id
+HPP_ACCOUNT=your_hpp_account
+HPP_SHARED_SECRET=your_hpp_shared_secret
+HPP_SANDBOX_URL=https://pay.sandbox.realexpayments.com/pay
+HPP_RESPONSE_URL=http://localhost:3001/hpp-response
 ```
+
+**⚠️ Never commit the `.env` file to version control!** It contains sensitive credentials.
 
 ## Getting Your Sandbox Credentials
 
@@ -125,11 +137,25 @@ http://localhost:3001
 globalpayments-api/
 ├── server.js                  # Express server with API integration
 ├── package.json               # Node.js dependencies
-├── config.json.example        # Example configuration file
-├── config.json               # Your actual config (not in git)
+├── .env.example              # Example environment variables
+├── .env                      # Your actual credentials (not in git)
 ├── public/
-│   └── index.html            # Payment form and results page
-└── README.md                 # This file
+│   ├── index.html            # Direct API payment form
+│   ├── transactions.html     # Transaction history
+│   ├── dropin.html          # HPP Drop-In UI
+│   ├── hpp-result.html      # HPP result page
+│   ├── css/                 # Modular stylesheets
+│   │   ├── main.css
+│   │   ├── transactions.css
+│   │   └── hpp.css
+│   └── js/                  # Modular JavaScript
+│       ├── payment.js
+│       ├── transactions.js
+│       ├── dropin.js
+│       └── hpp-result.js
+├── data/
+│   └── transactions.json    # Transaction log (auto-generated)
+└── README.md                # This file
 ```
 
 ## How It Works
@@ -183,24 +209,37 @@ The application sends XML requests to Global Payments:
 
 ⚠️ **CRITICAL Security Considerations:**
 
+- **Environment Variables**: All sensitive credentials are stored in `.env` file (not committed to git)
 - **PCI DSS Compliance**: This integration processes raw card data on your server. You MUST be PCI DSS compliant.
-- Never commit `config.json` with real credentials to version control
+- The `.env` file is in `.gitignore` to prevent accidental commits
+- Never share your `.env` file or commit it to version control
 - The shared secret must be kept confidential
 - Use HTTPS in production (required for PCI compliance)
 - Never log full card numbers in production
 - Implement proper data encryption
 - Consider using tokenization or HPP if PCI compliance is a concern
+- Rotate credentials regularly
+- Use different credentials for development, staging, and production
 
 ## Configuration Options
 
-### config.json Parameters
+### Environment Variables
 
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `merchantId` | Your Global Payments merchant ID | `"MerchantId123"` |
-| `account` | Sub-account for transactions | `"internet"` |
-| `sharedSecret` | Secret key for signature generation | `"secret123"` |
-| `apiUrl` | Global Payments API endpoint | `"https://api.sandbox.realexpayments.com/epage-remote.cgi"` |
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `PORT` | Server port | `3001` |
+| `NODE_ENV` | Environment mode | `development` or `production` |
+| `API_MERCHANT_ID` | Your Global Payments API merchant ID | `dev791880573356328554` |
+| `API_ACCOUNT` | API sub-account for transactions | `internet` |
+| `API_SHARED_SECRET` | Secret key for API signature generation | `hIAPYfgOhm` |
+| `API_URL` | Global Payments API endpoint | `https://api.sandbox.realexpayments.com/epage-remote.cgi` |
+| `HPP_MERCHANT_ID` | Your Global Payments HPP merchant ID | `regtest` |
+| `HPP_ACCOUNT` | HPP sub-account | `c2p` |
+| `HPP_SHARED_SECRET` | Secret key for HPP signature generation | `2A9wkRXR6W` |
+| `HPP_SANDBOX_URL` | HPP hosted page URL | `https://pay.sandbox.realexpayments.com/pay` |
+| `HPP_RESPONSE_URL` | URL where HPP redirects after payment | `http://localhost:3001/hpp-response` |
+
+**Note:** API and HPP credentials are separate and may have different values.
 
 ## Test Cards
 
@@ -224,6 +263,17 @@ Use these test cards in the sandbox environment:
 
 ## Troubleshooting
 
+### Environment variables not loaded
+```
+Error: Missing required environment variables
+```
+
+**Solution:**
+1. Ensure `.env` file exists in the project root
+2. Copy from example: `cp .env.example .env`
+3. Fill in all required variables
+4. Restart the server
+
 ### Merchant ID not recognized (Error 504)
 ```
 Result Code: 504
@@ -241,9 +291,10 @@ Message: There is no such merchant id
 **Important:** The merchant ID that works for HPP may not work for API. These are separate systems.
 
 ### Server won't start
-- Ensure `config.json` exists and contains valid JSON
-- Check that port 3001 is not already in use
-- Verify all dependencies are installed
+- Ensure `.env` file exists and contains all required variables
+- Check that port 3001 (or your PORT value) is not already in use
+- Verify all dependencies are installed (`npm install`)
+- Check for typos in environment variable names
 
 ### Signature verification fails
 - Verify your shared secret is correct

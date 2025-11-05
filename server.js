@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
@@ -5,9 +6,10 @@ const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
+const logger = require('./logger');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 const TRANSACTIONS_FILE = path.join(__dirname, 'data', 'transactions.json');
 
 // Middleware
@@ -15,24 +17,30 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Load configuration
-let config;
-try {
-  const configData = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
-  config = {
-    merchantId: configData.merchantId.trim(),
-    account: configData.account.trim(),
-    sharedSecret: configData.sharedSecret.trim(),
-    apiUrl: configData.apiUrl.trim(),
-    // HPP configuration (optional - may be same as API credentials)
-    hppMerchantId: (configData.hppMerchantId || configData.merchantId).trim(),
-    hppAccount: (configData.hppAccount || configData.account).trim(),
-    hppSharedSecret: (configData.hppSharedSecret || configData.sharedSecret).trim(),
-    hppSandboxUrl: (configData.hppSandboxUrl || 'https://hpp.sandbox.realexpayments.com/pay').trim(),
-    hppResponseUrl: (configData.hppResponseUrl || 'http://localhost:3001/hpp-response').trim()
-  };
-} catch (error) {
-  console.error('Error: config.json not found. Please copy config.json.example to config.json and add your credentials.');
+// Load configuration from environment variables
+const config = {
+  merchantId: process.env.API_MERCHANT_ID,
+  account: process.env.API_ACCOUNT,
+  sharedSecret: process.env.API_SHARED_SECRET,
+  apiUrl: process.env.API_URL,
+  // HPP configuration
+  hppMerchantId: process.env.HPP_MERCHANT_ID,
+  hppAccount: process.env.HPP_ACCOUNT,
+  hppSharedSecret: process.env.HPP_SHARED_SECRET,
+  hppSandboxUrl: process.env.HPP_SANDBOX_URL,
+  hppResponseUrl: process.env.HPP_RESPONSE_URL || 'http://localhost:3001/hpp-response'
+};
+
+// Validate required environment variables
+const requiredEnvVars = [
+  'API_MERCHANT_ID', 'API_ACCOUNT', 'API_SHARED_SECRET', 'API_URL',
+  'HPP_MERCHANT_ID', 'HPP_ACCOUNT', 'HPP_SHARED_SECRET', 'HPP_SANDBOX_URL'
+];
+
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingVars.length > 0) {
+  console.error('Error: Missing required environment variables:', missingVars.join(', '));
+  console.error('Please copy .env.example to .env and add your credentials.');
   process.exit(1);
 }
 
@@ -218,6 +226,12 @@ app.get('/', (req, res) => {
 app.post('/process-payment', async (req, res) => {
   const { amount, currency, cardNumber, cardHolderName, expiryMonth, expiryYear, cvv } = req.body;
   
+  logger.info('Payment request received', {
+    amount,
+    currency,
+    cardLast4: cardNumber ? cardNumber.slice(-4) : 'N/A'
+  });
+  
   console.log('\n=== Processing API Payment ===');
   console.log('Amount:', amount);
   console.log('Currency:', currency);
@@ -244,6 +258,8 @@ app.post('/process-payment', async (req, res) => {
     
     console.log('\n=== XML Request ===');
     console.log(xmlRequest);
+    
+    logger.debug('Sending payment request to Global Payments API', { orderId });
     
     // Send request to Global Payments API
     const response = await axios.post(config.apiUrl, xmlRequest, {
@@ -285,6 +301,16 @@ app.post('/process-payment', async (req, res) => {
     
     saveTransaction(transaction);
     
+    // Log payment result
+    logger.logPayment({
+      orderId: transaction.orderId,
+      amount: transaction.amount,
+      currency: transaction.currency,
+      resultCode: transaction.resultCode,
+      success: isSuccess,
+      cardNumber: maskedCardNumber
+    });
+    
     res.json({
       success: isSuccess,
       resultCode: parsedResponse.resultCode,
@@ -296,9 +322,11 @@ app.post('/process-payment', async (req, res) => {
     });
     
   } catch (error) {
+    logger.logError('process-payment', error);
     console.error('Payment Error:', error.message);
     if (error.response) {
       console.error('Response Data:', error.response.data);
+      logger.error('API Response Error', { data: error.response.data });
     }
     
     // Log failed transaction
@@ -331,6 +359,8 @@ app.post('/process-payment', async (req, res) => {
 app.post('/refund', async (req, res) => {
   const { orderId, amount } = req.body;
   
+  logger.info('Refund request received', { orderId, amount });
+  
   console.log('\n=== Processing Refund ===');
   console.log('Order ID:', orderId);
   console.log('Requested Amount:', amount);
@@ -341,6 +371,7 @@ app.post('/refund', async (req, res) => {
     const originalTransaction = transactions.find(t => t.orderId === orderId);
     
     if (!originalTransaction) {
+      logger.warn('Refund failed: Transaction not found', { orderId });
       return res.status(404).json({
         success: false,
         message: 'Transaction not found'
@@ -355,6 +386,7 @@ app.post('/refund', async (req, res) => {
     });
     
     if (!originalTransaction.success) {
+      logger.warn('Refund failed: Cannot refund failed transaction', { orderId });
       return res.status(400).json({
         success: false,
         message: 'Cannot refund a failed transaction'
@@ -367,6 +399,7 @@ app.post('/refund', async (req, res) => {
     );
     
     if (alreadyRefunded) {
+      logger.warn('Refund failed: Already refunded', { orderId });
       return res.status(400).json({
         success: false,
         message: 'Transaction has already been refunded'
@@ -386,6 +419,8 @@ app.post('/refund', async (req, res) => {
       authcode: originalTransaction.authCode,
       timestamp: timestamp
     });
+    
+    logger.debug('Sending refund request to Global Payments API', { orderId });
     
     console.log('\n=== Refund XML Request ===');
     console.log(xmlRequest);
@@ -429,6 +464,15 @@ app.post('/refund', async (req, res) => {
     
     saveTransaction(refundTransaction);
     
+    // Log refund result
+    logger.logRefund({
+      orderId: refundTransaction.orderId,
+      amount: refundTransaction.amount,
+      currency: refundTransaction.currency,
+      resultCode: refundTransaction.resultCode,
+      success: isSuccess
+    });
+    
     res.json({
       success: isSuccess,
       resultCode: parsedResponse.resultCode,
@@ -440,9 +484,11 @@ app.post('/refund', async (req, res) => {
     });
     
   } catch (error) {
+    logger.logError('refund', error);
     console.error('Refund Error:', error.message);
     if (error.response) {
       console.error('Response Data:', error.response.data);
+      logger.error('Refund API Response Error', { data: error.response.data });
     }
     
     res.status(500).json({
@@ -537,8 +583,11 @@ function verifyHppResponseSignature(timestamp, merchantId, orderId, result, mess
 app.post('/generate-hpp-token', (req, res) => {
   const { amount, currency, cardHolderName, customerEmail } = req.body;
   
+  logger.info('HPP token generation requested', { amount, currency });
+  
   // Validate input
   if (!amount || !currency) {
+    logger.warn('HPP token generation failed: Missing required fields');
     return res.status(400).json({
       success: false,
       message: 'Amount and currency are required'
@@ -560,6 +609,12 @@ app.post('/generate-hpp-token', (req, res) => {
     amountInCents,
     currency
   );
+  
+  logger.logHppRequest({
+    orderId,
+    amount: parseFloat(amount),
+    currency
+  });
   
   console.log('\n=== HPP Token Generation ===');
   console.log('Timestamp:', timestamp);
@@ -599,6 +654,7 @@ app.post('/generate-hpp-token', (req, res) => {
 
 // Route: Handle HPP response (POST)
 app.post('/hpp-response', (req, res) => {
+  logger.info('HPP POST response received', { body: req.body });
   console.log('\n=== HPP Response Received ===');
   console.log('Response Data:', req.body);
   
@@ -628,26 +684,35 @@ app.post('/hpp-response', (req, res) => {
   
   const isValid = expectedSignature === SHA1HASH;
   console.log('Signature Valid:', isValid);
+  logger.info('HPP signature validation', { isValid, result: RESULT });
   
-  // Log transaction
-  if (isValid && RESULT === '00') {
-    const transaction = {
-      orderId: ORDER_ID,
-      timestamp: new Date().toISOString(),
-      amount: parseFloat(AMOUNT) / 100,
-      currency: CURRENCY,
-      cardHolderName: 'HPP Payment',
-      maskedCardNumber: 'N/A',
-      resultCode: RESULT,
-      message: MESSAGE,
-      success: true,
-      authCode: AUTHCODE,
-      pasRef: PASREF,
-      account: config.hppAccount,
-      type: 'hpp'
-    };
-    saveTransaction(transaction);
-  }
+  // Log transaction - save ALL HPP transactions, not just successful ones
+  const transaction = {
+    orderId: ORDER_ID,
+    timestamp: new Date().toISOString(),
+    amount: AMOUNT ? parseFloat(AMOUNT) / 100 : 0,
+    currency: CURRENCY || 'N/A',
+    cardHolderName: 'HPP Payment',
+    maskedCardNumber: 'N/A',
+    resultCode: RESULT,
+    message: MESSAGE || 'No message',
+    success: RESULT === '00' && isValid,
+    authCode: AUTHCODE || '',
+    pasRef: PASREF || '',
+    account: config.hppAccount,
+    type: 'hpp',
+    signatureValid: isValid
+  };
+  
+  saveTransaction(transaction);
+  logger.info('HPP transaction saved', { orderId: ORDER_ID, success: transaction.success });
+  
+  // Log HPP response
+  logger.logHppResponse({
+    orderId: ORDER_ID,
+    result: RESULT,
+    valid: isValid
+  });
   
   // Redirect to result page with parameters
   const params = new URLSearchParams({
@@ -666,6 +731,7 @@ app.post('/hpp-response', (req, res) => {
 
 // Route: Handle HPP response (GET for testing)
 app.get('/hpp-response', (req, res) => {
+  logger.info('HPP GET response received', { query: req.query });
   console.log('\n=== HPP Response Received (GET) ===');
   console.log('Response Data:', req.query);
   
@@ -695,26 +761,35 @@ app.get('/hpp-response', (req, res) => {
   
   const isValid = expectedSignature === SHA1HASH;
   console.log('Signature Valid:', isValid);
+  logger.info('HPP signature validation (GET)', { isValid, result: RESULT });
   
-  // Log transaction
-  if (isValid && RESULT === '00') {
-    const transaction = {
-      orderId: ORDER_ID,
-      timestamp: new Date().toISOString(),
-      amount: parseFloat(AMOUNT) / 100,
-      currency: CURRENCY,
-      cardHolderName: 'HPP Payment',
-      maskedCardNumber: 'N/A',
-      resultCode: RESULT,
-      message: MESSAGE,
-      success: true,
-      authCode: AUTHCODE,
-      pasRef: PASREF,
-      account: config.hppAccount,
-      type: 'hpp'
-    };
-    saveTransaction(transaction);
-  }
+  // Log transaction - save ALL HPP transactions, not just successful ones
+  const transaction = {
+    orderId: ORDER_ID,
+    timestamp: new Date().toISOString(),
+    amount: AMOUNT ? parseFloat(AMOUNT) / 100 : 0,
+    currency: CURRENCY || 'N/A',
+    cardHolderName: 'HPP Payment',
+    maskedCardNumber: 'N/A',
+    resultCode: RESULT,
+    message: MESSAGE || 'No message',
+    success: RESULT === '00' && isValid,
+    authCode: AUTHCODE || '',
+    pasRef: PASREF || '',
+    account: config.hppAccount,
+    type: 'hpp',
+    signatureValid: isValid
+  };
+  
+  saveTransaction(transaction);
+  logger.info('HPP transaction saved (GET)', { orderId: ORDER_ID, success: transaction.success });
+  
+  // Log HPP response
+  logger.logHppResponse({
+    orderId: ORDER_ID,
+    result: RESULT,
+    valid: isValid
+  });
   
   // Redirect to result page with parameters
   const params = new URLSearchParams({
@@ -733,12 +808,18 @@ app.get('/hpp-response', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
+  logger.info(`Global Payments API Server started on port ${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`Log level: ${process.env.LOG_LEVEL || 'info'}`);
+  logger.info(`Configuration loaded from environment variables`);
+  
   console.log(`Global Payments API Server running on http://localhost:${PORT}`);
-  console.log(`Configuration loaded:`, {
-    merchantId: config.merchantId,
-    account: config.account,
-    apiUrl: config.apiUrl
-  });
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Configuration loaded from environment variables`);
+  console.log(`  API Merchant ID: ${config.merchantId}`);
+  console.log(`  API Account: ${config.account}`);
+  console.log(`  HPP Merchant ID: ${config.hppMerchantId}`);
+  console.log(`  HPP Account: ${config.hppAccount}`);
   console.log('\n⚠️  IMPORTANT: API credentials are different from HPP credentials!');
   console.log('If you haven\'t registered for API access, contact Global Payments support.\n');
 });
