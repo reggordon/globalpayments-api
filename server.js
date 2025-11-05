@@ -23,7 +23,13 @@ try {
     merchantId: configData.merchantId.trim(),
     account: configData.account.trim(),
     sharedSecret: configData.sharedSecret.trim(),
-    apiUrl: configData.apiUrl.trim()
+    apiUrl: configData.apiUrl.trim(),
+    // HPP configuration (optional - may be same as API credentials)
+    hppMerchantId: (configData.hppMerchantId || configData.merchantId).trim(),
+    hppAccount: (configData.hppAccount || configData.account).trim(),
+    hppSharedSecret: (configData.hppSharedSecret || configData.sharedSecret).trim(),
+    hppSandboxUrl: (configData.hppSandboxUrl || 'https://hpp.sandbox.realexpayments.com/pay').trim(),
+    hppResponseUrl: (configData.hppResponseUrl || 'http://localhost:3001/hpp-response').trim()
   };
 } catch (error) {
   console.error('Error: config.json not found. Please copy config.json.example to config.json and add your credentials.');
@@ -494,6 +500,235 @@ app.get('/transactions/stats', (req, res) => {
       message: 'Failed to load stats: ' + error.message
     });
   }
+});
+
+// ========================================
+// HPP (Hosted Payment Page) Integration
+// ========================================
+
+// Helper function to generate HPP signature
+function generateHppSignature(timestamp, merchantId, orderId, amount, currency) {
+  // Step 1: timestamp.merchantid.orderid.amount.currency
+  const step1 = `${timestamp}.${merchantId}.${orderId}.${amount}.${currency}`;
+  console.log('HPP Signature Step 1:', step1);
+  const hash1 = generateSha1Hash(step1);
+  console.log('HPP Hash 1:', hash1);
+  
+  // Step 2: hash1.secret
+  const step2 = `${hash1}.${config.hppSharedSecret}`;
+  const hash2 = generateSha1Hash(step2);
+  console.log('HPP Final Hash:', hash2);
+  
+  return hash2;
+}
+
+// Helper function to verify HPP response signature
+function verifyHppResponseSignature(timestamp, merchantId, orderId, result, message, pasref, authcode) {
+  const step1 = `${timestamp}.${merchantId}.${orderId}.${result}.${message}.${pasref}.${authcode}`;
+  const hash1 = generateSha1Hash(step1);
+  
+  const step2 = `${hash1}.${config.hppSharedSecret}`;
+  const hash2 = generateSha1Hash(step2);
+  
+  return hash2;
+}
+
+// Route: Generate HPP token/parameters
+app.post('/generate-hpp-token', (req, res) => {
+  const { amount, currency, cardHolderName, customerEmail } = req.body;
+  
+  // Validate input
+  if (!amount || !currency) {
+    return res.status(400).json({
+      success: false,
+      message: 'Amount and currency are required'
+    });
+  }
+  
+  // Generate unique order ID
+  const orderId = `HPP-${Date.now()}`;
+  const timestamp = getTimestamp();
+  
+  // Convert amount to cents
+  const amountInCents = Math.round(parseFloat(amount) * 100).toString();
+  
+  // Generate signature
+  const signature = generateHppSignature(
+    timestamp,
+    config.hppMerchantId,
+    orderId,
+    amountInCents,
+    currency
+  );
+  
+  console.log('\n=== HPP Token Generation ===');
+  console.log('Timestamp:', timestamp);
+  console.log('Merchant ID:', config.hppMerchantId);
+  console.log('Order ID:', orderId);
+  console.log('Amount:', amountInCents);
+  console.log('Currency:', currency);
+  console.log('Generated Hash:', signature);
+  
+  // Prepare HPP parameters - match exact structure of working HPP app
+  const hppData = {
+    TIMESTAMP: timestamp,
+    MERCHANT_ID: config.hppMerchantId,
+    ACCOUNT: config.hppAccount,
+    ORDER_ID: orderId,
+    AMOUNT: amountInCents,
+    CURRENCY: currency,
+    AUTO_SETTLE_FLAG: '1',
+    MERCHANT_RESPONSE_URL: config.hppResponseUrl,
+    HPP_VERSION: '2',
+    SHA1HASH: signature,
+    COMMENT1: 'Drop-In UI Payment',
+    COMMENT2: ''
+  };
+  
+  // Optional fields - only CUST_NUM if provided (not HPP_CUSTOMER_EMAIL for now)
+  if (cardHolderName) {
+    hppData.CUST_NUM = cardHolderName;
+  }
+  
+  res.json({
+    success: true,
+    hppUrl: config.hppSandboxUrl,
+    hppData: hppData
+  });
+});
+
+// Route: Handle HPP response (POST)
+app.post('/hpp-response', (req, res) => {
+  console.log('\n=== HPP Response Received ===');
+  console.log('Response Data:', req.body);
+  
+  const {
+    TIMESTAMP,
+    MERCHANT_ID,
+    ORDER_ID,
+    RESULT,
+    MESSAGE,
+    PASREF,
+    AUTHCODE,
+    SHA1HASH,
+    AMOUNT,
+    CURRENCY
+  } = req.body;
+  
+  // Verify signature
+  const expectedSignature = verifyHppResponseSignature(
+    TIMESTAMP,
+    MERCHANT_ID,
+    ORDER_ID,
+    RESULT,
+    MESSAGE,
+    PASREF || '',
+    AUTHCODE || ''
+  );
+  
+  const isValid = expectedSignature === SHA1HASH;
+  console.log('Signature Valid:', isValid);
+  
+  // Log transaction
+  if (isValid && RESULT === '00') {
+    const transaction = {
+      orderId: ORDER_ID,
+      timestamp: new Date().toISOString(),
+      amount: parseFloat(AMOUNT) / 100,
+      currency: CURRENCY,
+      cardHolderName: 'HPP Payment',
+      maskedCardNumber: 'N/A',
+      resultCode: RESULT,
+      message: MESSAGE,
+      success: true,
+      authCode: AUTHCODE,
+      pasRef: PASREF,
+      account: config.hppAccount,
+      type: 'hpp'
+    };
+    saveTransaction(transaction);
+  }
+  
+  // Redirect to result page with parameters
+  const params = new URLSearchParams({
+    result: RESULT,
+    message: MESSAGE,
+    orderId: ORDER_ID,
+    authCode: AUTHCODE || '',
+    pasRef: PASREF || '',
+    valid: isValid.toString(),
+    amount: AMOUNT ? (parseFloat(AMOUNT) / 100).toFixed(2) : '0',
+    currency: CURRENCY || ''
+  });
+  
+  res.redirect(`/hpp-result.html?${params.toString()}`);
+});
+
+// Route: Handle HPP response (GET for testing)
+app.get('/hpp-response', (req, res) => {
+  console.log('\n=== HPP Response Received (GET) ===');
+  console.log('Response Data:', req.query);
+  
+  const {
+    TIMESTAMP,
+    MERCHANT_ID,
+    ORDER_ID,
+    RESULT,
+    MESSAGE,
+    PASREF,
+    AUTHCODE,
+    SHA1HASH,
+    AMOUNT,
+    CURRENCY
+  } = req.query;
+  
+  // Verify signature
+  const expectedSignature = verifyHppResponseSignature(
+    TIMESTAMP,
+    MERCHANT_ID,
+    ORDER_ID,
+    RESULT,
+    MESSAGE,
+    PASREF || '',
+    AUTHCODE || ''
+  );
+  
+  const isValid = expectedSignature === SHA1HASH;
+  console.log('Signature Valid:', isValid);
+  
+  // Log transaction
+  if (isValid && RESULT === '00') {
+    const transaction = {
+      orderId: ORDER_ID,
+      timestamp: new Date().toISOString(),
+      amount: parseFloat(AMOUNT) / 100,
+      currency: CURRENCY,
+      cardHolderName: 'HPP Payment',
+      maskedCardNumber: 'N/A',
+      resultCode: RESULT,
+      message: MESSAGE,
+      success: true,
+      authCode: AUTHCODE,
+      pasRef: PASREF,
+      account: config.hppAccount,
+      type: 'hpp'
+    };
+    saveTransaction(transaction);
+  }
+  
+  // Redirect to result page with parameters
+  const params = new URLSearchParams({
+    result: RESULT,
+    message: MESSAGE,
+    orderId: ORDER_ID,
+    authCode: AUTHCODE || '',
+    pasRef: PASREF || '',
+    valid: isValid.toString(),
+    amount: AMOUNT ? (parseFloat(AMOUNT) / 100).toFixed(2) : '0',
+    currency: CURRENCY || ''
+  });
+  
+  res.redirect(`/hpp-result.html?${params.toString()}`);
 });
 
 // Start server
