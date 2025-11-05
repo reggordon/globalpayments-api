@@ -8,6 +8,7 @@ const path = require('path');
 
 const app = express();
 const PORT = 3001;
+const TRANSACTIONS_FILE = path.join(__dirname, 'data', 'transactions.json');
 
 // Middleware
 app.use(bodyParser.json());
@@ -27,6 +28,42 @@ try {
 } catch (error) {
   console.error('Error: config.json not found. Please copy config.json.example to config.json and add your credentials.');
   process.exit(1);
+}
+
+// Initialize transactions file if it doesn't exist
+if (!fs.existsSync(path.join(__dirname, 'data'))) {
+  fs.mkdirSync(path.join(__dirname, 'data'));
+}
+if (!fs.existsSync(TRANSACTIONS_FILE)) {
+  fs.writeFileSync(TRANSACTIONS_FILE, JSON.stringify([], null, 2));
+}
+
+// Transaction logging functions
+function loadTransactions() {
+  try {
+    const data = fs.readFileSync(TRANSACTIONS_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error loading transactions:', error);
+    return [];
+  }
+}
+
+function saveTransaction(transaction) {
+  try {
+    const transactions = loadTransactions();
+    transactions.unshift(transaction); // Add to beginning
+    
+    // Keep only last 1000 transactions
+    if (transactions.length > 1000) {
+      transactions.splice(1000);
+    }
+    
+    fs.writeFileSync(TRANSACTIONS_FILE, JSON.stringify(transactions, null, 2));
+    console.log('Transaction saved:', transaction.orderId);
+  } catch (error) {
+    console.error('Error saving transaction:', error);
+  }
 }
 
 // Helper function to generate timestamp
@@ -92,6 +129,45 @@ function buildAuthRequest(orderData) {
     </cvn>
   </card>
   <autosettle flag="1"/>
+  <sha1hash>${signature}</sha1hash>
+</request>`;
+}
+
+// Helper function to generate refund signature
+function generateRefundSignature(timestamp, merchantId, orderId) {
+  // For rebate/refund: timestamp.merchantid.orderid.. (empty amount and currency)
+  const step1 = `${timestamp}.${merchantId}.${orderId}..`;
+  console.log('Refund Signature Step 1:', step1);
+  const hash1 = generateSha1Hash(step1);
+  console.log('Refund Hash 1:', hash1);
+  
+  // Step 2: hash1.secret
+  const step2 = `${hash1}.${config.sharedSecret}`;
+  const hash2 = generateSha1Hash(step2);
+  console.log('Refund Final Hash:', hash2);
+  
+  return hash2;
+}
+
+// Helper function to build refund XML request
+function buildRefundRequest(refundData) {
+  const { orderId, amount, currency, pasref, authcode, timestamp } = refundData;
+  
+  const signature = generateRefundSignature(
+    timestamp,
+    config.merchantId,
+    orderId
+  );
+  
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<request type="rebate" timestamp="${timestamp}">
+  <merchantid>${config.merchantId}</merchantid>
+  <account>${config.account}</account>
+  <orderid>${orderId}</orderid>
+  <pasref>${pasref}</pasref>
+  <authcode>${authcode}</authcode>
+  <amount currency="${currency}">${amount}</amount>
+  <refundhash>${signature}</refundhash>
   <sha1hash>${signature}</sha1hash>
 </request>`;
 }
@@ -182,6 +258,27 @@ app.post('/process-payment', async (req, res) => {
     // Determine success
     const isSuccess = parsedResponse.resultCode === '00';
     
+    // Mask card number for logging
+    const maskedCardNumber = cardNumber.slice(0, 6) + '****' + cardNumber.slice(-4);
+    
+    // Log transaction
+    const transaction = {
+      orderId: parsedResponse.orderId || orderId,
+      timestamp: new Date().toISOString(),
+      amount: parseFloat(amount),
+      currency: currency,
+      cardHolderName: cardHolderName,
+      maskedCardNumber: maskedCardNumber,
+      resultCode: parsedResponse.resultCode,
+      message: parsedResponse.message,
+      success: isSuccess,
+      authCode: parsedResponse.authCode,
+      pasRef: parsedResponse.pasRef,
+      account: config.account
+    };
+    
+    saveTransaction(transaction);
+    
     res.json({
       success: isSuccess,
       resultCode: parsedResponse.resultCode,
@@ -198,9 +295,203 @@ app.post('/process-payment', async (req, res) => {
       console.error('Response Data:', error.response.data);
     }
     
+    // Log failed transaction
+    const maskedCardNumber = cardNumber ? cardNumber.slice(0, 6) + '****' + cardNumber.slice(-4) : 'N/A';
+    const failedTransaction = {
+      orderId: orderId || 'ERROR',
+      timestamp: new Date().toISOString(),
+      amount: parseFloat(amount) || 0,
+      currency: currency || 'N/A',
+      cardHolderName: cardHolderName || 'N/A',
+      maskedCardNumber: maskedCardNumber,
+      resultCode: '999',
+      message: 'System error: ' + error.message,
+      success: false,
+      authCode: null,
+      pasRef: null,
+      account: config.account
+    };
+    
+    saveTransaction(failedTransaction);
+    
     res.status(500).json({
       success: false,
       message: 'Payment processing failed: ' + error.message
+    });
+  }
+});
+
+// Route: Process refund
+app.post('/refund', async (req, res) => {
+  const { orderId, amount } = req.body;
+  
+  console.log('\n=== Processing Refund ===');
+  console.log('Order ID:', orderId);
+  console.log('Requested Amount:', amount);
+  
+  try {
+    // Find original transaction
+    const transactions = loadTransactions();
+    const originalTransaction = transactions.find(t => t.orderId === orderId);
+    
+    if (!originalTransaction) {
+      return res.status(404).json({
+        success: false,
+        message: 'Transaction not found'
+      });
+    }
+    
+    console.log('Original Transaction Found:', {
+      pasRef: originalTransaction.pasRef,
+      authCode: originalTransaction.authCode,
+      amount: originalTransaction.amount,
+      currency: originalTransaction.currency
+    });
+    
+    if (!originalTransaction.success) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot refund a failed transaction'
+      });
+    }
+    
+    // Check if already successfully refunded
+    const alreadyRefunded = transactions.some(t => 
+      t.type === 'refund' && t.originalOrderId === orderId && t.success === true
+    );
+    
+    if (alreadyRefunded) {
+      return res.status(400).json({
+        success: false,
+        message: 'Transaction has already been refunded'
+      });
+    }
+    
+    const timestamp = getTimestamp();
+    const refundAmount = amount ? Math.round(parseFloat(amount) * 100).toString() : 
+                         Math.round(originalTransaction.amount * 100).toString();
+    
+    // Build refund XML request
+    const xmlRequest = buildRefundRequest({
+      orderId: orderId,
+      amount: refundAmount,
+      currency: originalTransaction.currency,
+      pasref: originalTransaction.pasRef,
+      authcode: originalTransaction.authCode,
+      timestamp: timestamp
+    });
+    
+    console.log('\n=== Refund XML Request ===');
+    console.log(xmlRequest);
+    
+    // Send refund request to Global Payments API
+    const response = await axios.post(config.apiUrl, xmlRequest, {
+      headers: {
+        'Content-Type': 'application/xml'
+      }
+    });
+    
+    console.log('\n=== Refund XML Response ===');
+    console.log(response.data);
+    
+    // Parse response
+    const parsedResponse = parseXmlResponse(response.data);
+    
+    console.log('\n=== Parsed Refund Response ===');
+    console.log(parsedResponse);
+    
+    // Determine success
+    const isSuccess = parsedResponse.resultCode === '00';
+    
+    // Log refund transaction
+    const refundTransaction = {
+      orderId: parsedResponse.orderId || `REFUND-${Date.now()}`,
+      originalOrderId: orderId,
+      timestamp: new Date().toISOString(),
+      amount: parseFloat(refundAmount) / 100,
+      currency: originalTransaction.currency,
+      cardHolderName: originalTransaction.cardHolderName,
+      maskedCardNumber: originalTransaction.maskedCardNumber,
+      resultCode: parsedResponse.resultCode,
+      message: parsedResponse.message,
+      success: isSuccess,
+      authCode: parsedResponse.authCode,
+      pasRef: parsedResponse.pasRef,
+      account: config.account,
+      type: 'refund'
+    };
+    
+    saveTransaction(refundTransaction);
+    
+    res.json({
+      success: isSuccess,
+      resultCode: parsedResponse.resultCode,
+      message: parsedResponse.message,
+      orderId: parsedResponse.orderId,
+      authCode: parsedResponse.authCode,
+      pasRef: parsedResponse.pasRef,
+      refundAmount: parseFloat(refundAmount) / 100
+    });
+    
+  } catch (error) {
+    console.error('Refund Error:', error.message);
+    if (error.response) {
+      console.error('Response Data:', error.response.data);
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Refund processing failed: ' + error.message
+    });
+  }
+});
+
+// Route: Get transaction history
+app.get('/transactions', (req, res) => {
+  try {
+    const transactions = loadTransactions();
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+    
+    const paginatedTransactions = transactions.slice(offset, offset + limit);
+    
+    res.json({
+      success: true,
+      total: transactions.length,
+      limit: limit,
+      offset: offset,
+      transactions: paginatedTransactions
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load transactions: ' + error.message
+    });
+  }
+});
+
+// Route: Get transaction stats
+app.get('/transactions/stats', (req, res) => {
+  try {
+    const transactions = loadTransactions();
+    
+    const stats = {
+      total: transactions.length,
+      successful: transactions.filter(t => t.success).length,
+      failed: transactions.filter(t => !t.success).length,
+      totalAmount: transactions.filter(t => t.success).reduce((sum, t) => sum + t.amount, 0),
+      currencies: [...new Set(transactions.map(t => t.currency))],
+      lastTransaction: transactions[0] || null
+    };
+    
+    res.json({
+      success: true,
+      stats: stats
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load stats: ' + error.message
     });
   }
 });

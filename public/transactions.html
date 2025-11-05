@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction History - Global Payments API</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+        }
+
+        .header a {
+            background: white;
+            color: #667eea;
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+
+        .header a:hover {
+            transform: translateY(-2px);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-card h3 {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .stat-card .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .stat-card.success .value {
+            color: #28a745;
+        }
+
+        .stat-card.failed .value {
+            color: #dc3545;
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .controls button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .controls button:hover {
+            background: #5568d3;
+        }
+
+        .table-container {
+            padding: 30px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: #f8f9fa;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status.refund {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .btn-refund {
+            padding: 6px 12px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .btn-refund:hover {
+            background: #c82333;
+        }
+
+        .btn-refund:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .card-number {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .amount {
+            font-weight: 600;
+        }
+
+        .timestamp {
+            font-size: 13px;
+            color: #666;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .modal-body label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .modal-body input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-footer button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .btn-cancel {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-cancel:hover {
+            background: #5a6268;
+        }
+
+        .btn-confirm {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-confirm:hover {
+            background: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Transaction History</h1>
+            <a href="/">← Back to Payments</a>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <h3>Total Transactions</h3>
+                <div class="value" id="totalTransactions">-</div>
+            </div>
+            <div class="stat-card success">
+                <h3>Successful</h3>
+                <div class="value" id="successfulTransactions">-</div>
+            </div>
+            <div class="stat-card failed">
+                <h3>Failed</h3>
+                <div class="value" id="failedTransactions">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Amount</h3>
+                <div class="value" id="totalAmount">-</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="refreshData()">🔄 Refresh</button>
+            <button onclick="exportToCSV()">📥 Export CSV</button>
+        </div>
+
+        <div class="table-container">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Loading transactions...</p>
+            </div>
+
+            <div class="empty-state" id="emptyState" style="display: none;">
+                <h3>No Transactions Yet</h3>
+                <p>Process a payment to see it appear here.</p>
+            </div>
+
+            <table id="transactionsTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Date/Time</th>
+                        <th>Order ID</th>
+                        <th>Status</th>
+                        <th>Amount</th>
+                        <th>Card</th>
+                        <th>Cardholder</th>
+                        <th>Auth Code</th>
+                        <th>Message</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionsBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let allTransactions = [];
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/transactions/stats');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('totalTransactions').textContent = data.stats.total;
+                    document.getElementById('successfulTransactions').textContent = data.stats.successful;
+                    document.getElementById('failedTransactions').textContent = data.stats.failed;
+                    document.getElementById('totalAmount').textContent = 
+                        new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR' }).format(data.stats.totalAmount);
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        async function loadTransactions() {
+            try {
+                const response = await fetch('/transactions?limit=100');
+                const data = await response.json();
+                
+                if (data.success) {
+                    allTransactions = data.transactions;
+                    displayTransactions(data.transactions);
+                }
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.transactions.length === 0) {
+                    document.getElementById('emptyState').style.display = 'block';
+                } else {
+                    document.getElementById('transactionsTable').style.display = 'table';
+                }
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+                document.getElementById('loading').innerHTML = '<p>Error loading transactions</p>';
+            }
+        }
+
+        function displayTransactions(transactions) {
+            const tbody = document.getElementById('transactionsBody');
+            tbody.innerHTML = '';
+            
+            transactions.forEach(transaction => {
+                const row = document.createElement('tr');
+                
+                const date = new Date(transaction.timestamp);
+                const formattedDate = date.toLocaleString();
+                
+                let statusClass = 'failed';
+                let statusText = 'Failed';
+                
+                if (transaction.type === 'refund') {
+                    statusClass = 'refund';
+                    statusText = 'Refunded';
+                } else if (transaction.success) {
+                    statusClass = 'success';
+                    statusText = 'Success';
+                }
+                
+                const amount = new Intl.NumberFormat('en-US', { 
+                    style: 'currency', 
+                    currency: transaction.currency 
+                }).format(transaction.amount);
+                
+                // Check if refund button should be shown
+                const canRefund = transaction.success && 
+                                 transaction.type !== 'refund' && 
+                                 !transaction.refunded;
+                
+                let actionCell = '-';
+                if (canRefund) {
+                    actionCell = `<button class="btn-refund" onclick="openRefundModal('${transaction.orderId}', ${transaction.amount}, '${transaction.currency}')">Refund</button>`;
+                } else if (transaction.refunded) {
+                    actionCell = '<span style="color: #856404; font-size: 12px;">Refunded</span>';
+                }
+                
+                row.innerHTML = `
+                    <td class="timestamp">${formattedDate}</td>
+                    <td><code>${transaction.orderId}</code></td>
+                    <td><span class="status ${statusClass}">${statusText}</span></td>
+                    <td class="amount">${amount}</td>
+                    <td class="card-number">${transaction.maskedCardNumber}</td>
+                    <td>${transaction.cardHolderName}</td>
+                    <td>${transaction.authCode || '-'}</td>
+                    <td style="font-size: 13px;">${transaction.message}</td>
+                    <td>${actionCell}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        function refreshData() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('transactionsTable').style.display = 'none';
+            document.getElementById('emptyState').style.display = 'none';
+            
+            loadStats();
+            loadTransactions();
+        }
+
+        function exportToCSV() {
+            if (allTransactions.length === 0) {
+                alert('No transactions to export');
+                return;
+            }
+            
+            const headers = ['Timestamp', 'Order ID', 'Status', 'Amount', 'Currency', 'Card Number', 'Cardholder', 'Auth Code', 'Result Code', 'Message'];
+            const csvContent = [
+                headers.join(','),
+                ...allTransactions.map(t => [
+                    t.timestamp,
+                    t.orderId,
+                    t.success ? 'Success' : 'Failed',
+                    t.amount,
+                    t.currency,
+                    t.maskedCardNumber,
+                    `"${t.cardHolderName}"`,
+                    t.authCode || '',
+                    t.resultCode,
+                    `"${t.message}"`
+                ].join(','))
+            ].join('\n');
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Load data on page load
+        loadStats();
+        loadTransactions();
+
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            loadStats();
+            loadTransactions();
+        }, 30000);
+
+        // Refund Modal Functions
+        let currentRefundOrderId = null;
+        let currentRefundAmount = null;
+        let currentRefundCurrency = null;
+
+        function openRefundModal(orderId, amount, currency) {
+            currentRefundOrderId = orderId;
+            currentRefundAmount = amount;
+            currentRefundCurrency = currency;
+            
+            document.getElementById('refundOrderId').textContent = `Order: ${orderId}`;
+            document.getElementById('originalAmount').textContent = 
+                new Intl.NumberFormat('en-US', { 
+                    style: 'currency', 
+                    currency: currency 
+                }).format(amount);
+            document.getElementById('refundAmount').value = '';
+            document.getElementById('refundAmount').max = amount;
+            document.getElementById('refundModal').classList.add('active');
+        }
+
+        function closeRefundModal() {
+            document.getElementById('refundModal').classList.remove('active');
+            currentRefundOrderId = null;
+            currentRefundAmount = null;
+            currentRefundCurrency = null;
+        }
+
+        async function confirmRefund() {
+            const refundAmountInput = document.getElementById('refundAmount');
+            const refundAmount = refundAmountInput.value ? parseFloat(refundAmountInput.value) : null;
+            
+            // Validate partial refund amount
+            if (refundAmount !== null) {
+                if (refundAmount <= 0) {
+                    alert('Refund amount must be greater than 0');
+                    return;
+                }
+                if (refundAmount > currentRefundAmount) {
+                    alert('Refund amount cannot exceed original transaction amount');
+                    return;
+                }
+            }
+            
+            const confirmMsg = refundAmount !== null 
+                ? `Confirm partial refund of ${new Intl.NumberFormat('en-US', { 
+                    style: 'currency', 
+                    currency: currentRefundCurrency 
+                  }).format(refundAmount)}?`
+                : `Confirm full refund of ${new Intl.NumberFormat('en-US', { 
+                    style: 'currency', 
+                    currency: currentRefundCurrency 
+                  }).format(currentRefundAmount)}?`;
+            
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+            
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+            
+            try {
+                const response = await fetch('/refund', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId: currentRefundOrderId,
+                        amount: refundAmount
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Refund successful!\n\nOrder ID: ${result.orderId}\nAuth Code: ${result.authCode}\nMessage: ${result.message}`);
+                    closeRefundModal();
+                    loadStats();
+                    loadTransactions();
+                } else {
+                    alert(`Refund failed:\n${result.message}`);
+                }
+            } catch (error) {
+                alert(`Error processing refund: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Confirm Refund';
+            }
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('refundModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeRefundModal();
+            }
+        });
+    </script>
+
+    <!-- Refund Modal -->
+    <div id="refundModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Refund Transaction</h2>
+                <p id="refundOrderId" style="color: #666; font-size: 14px;"></p>
+            </div>
+            <div class="modal-body">
+                <label for="refundAmount">
+                    Refund Amount (optional - leave blank for full refund)
+                </label>
+                <input type="number" id="refundAmount" step="0.01" min="0" placeholder="Enter amount or leave blank">
+                <p style="margin-top: 10px; font-size: 13px; color: #666;">
+                    Original Amount: <span id="originalAmount"></span>
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeRefundModal()">Cancel</button>
+                <button class="btn-confirm" onclick="confirmRefund()">Confirm Refund</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
