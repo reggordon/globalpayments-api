@@ -1,0 +1,101 @@
+/* HPP Drop-In UI and Result Page Styles */
+
+#dropin-container {
+    margin: 20px 0;
+    min-height: 300px;
+}
+
+/* RXP Hosted Fields Styling */
+.rxp-hosted-field {
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 12px;
+    height: 48px;
+    margin-bottom: 15px;
+}
+
+.rxp-hosted-field:focus {
+    border-color: #667eea;
+}
+
+.rxp-hosted-field.rxp-hosted-field--invalid {
+    border-color: #e74c3c;
+}
+
+/* HPP Result Page Specific Styles */
+.result-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+}
+
+.result-message {
+    font-size: 18px;
+    margin-bottom: 30px;
+    color: #333;
+}
+
+.transaction-details {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: left;
+    margin-bottom: 30px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    font-weight: 600;
+    color: #666;
+}
+
+.detail-value {
+    color: #333;
+    font-family: 'Courier New', monospace;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.actions button, .actions a {
+    padding: 12px 24px;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: all 0.3s;
+    display: inline-block;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-primary:hover {
+    background: #5568d3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: none;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
