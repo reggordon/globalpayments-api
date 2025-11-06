@@ -1,22 +1,71 @@
 # Global Payments API Integration
 
-A Node.js application for direct server-to-server integration with Global Payments sandbox environment.
+A complete, production-ready Node.js application for integrating with Global Payments (Realex). Includes both Direct API and Hosted Payment Page (HPP) implementations.
+
+**🎯 Ready to use with your own Global Payments account!**
 
 ## Quick Start
 
 ```bash
+# Clone the repository
+git clone https://github.com/reggordon/globalpayments-api.git
+cd globalpayments-api
+
 # Install dependencies
 npm install
 
-# Configure environment
+# Configure with YOUR credentials
 cp .env.example .env
-# Edit .env with your credentials
+# Edit .env with your Global Payments credentials
 
 # Start server
 npm start
 ```
 
 Open http://localhost:3001
+
+## What's Included
+
+✅ **Direct API Integration**
+- Hosted Fields for secure card entry
+- Server-side payment processing  
+- Full PCI-compliant card handling
+
+✅ **HPP Integration** (4 implementation modes)
+- Lightbox (popup overlay)
+- Redirect (full page redirect)
+- Iframe (embedded frame)
+- Drop-in (full iframe UI)
+
+✅ **Transaction Management**
+- Separate history for API and HPP transactions
+- Export to CSV
+- View raw gateway responses for debugging
+- Real-time statistics dashboard
+
+✅ **Production Ready**
+- Automated Google Cloud Run deployment
+- Environment-based configuration
+- Comprehensive logging with Winston
+- Security best practices included
+
+## Getting Started
+
+### For New Users
+
+See **[SETUP.md](./SETUP.md)** for complete setup instructions including:
+- How to get Global Payments credentials
+- Local development setup
+- Testing with sandbox
+- Production deployment
+
+### For Quick Deploy
+
+```bash
+cp .env.yaml.example .env.yaml
+# Edit .env.yaml with your credentials
+./deploy.sh
+```
 
 ## Features
 
