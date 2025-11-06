@@ -1,6 +1,7 @@
 // Stored Cards Management
 
 let currentChargeToken = null;
+let realvaultEnabled = false;
 
 // Load and display stored cards
 async function loadStoredCards() {
@@ -40,18 +41,19 @@ function displayCards(cards) {
         
         cardElement.innerHTML = `
             <div>
-                <div class="card-brand">${card.cardBrand}</div>
+                <div class="card-brand">${card.cardBrand}${card.storedInRealvault ? ' 🔒' : ''}</div>
                 <div class="card-number">${card.maskedCardNumber}</div>
                 <div class="card-holder">${card.cardHolderName}</div>
                 <div class="card-expiry">Expires: ${card.expiryMonth}/${card.expiryYear}</div>
                 <div class="card-meta">
                     <div>Added: ${createdDate}</div>
                     <div>${lastUsedText}</div>
+                    ${card.storedInRealvault ? '<div style="font-size: 11px; color: #90EE90;">✓ Stored in Realvault</div>' : '<div style="font-size: 11px; color: #FFD700;">⚠ Local storage only</div>'}
                 </div>
             </div>
             <div class="card-actions">
-                <button class="btn-charge" onclick="openChargeModal('${card.token}', '${card.maskedCardNumber}', '${card.cardHolderName}')">
-                    💳 Charge (Demo)
+                <button class="btn-charge" onclick="openChargeModal('${card.token}', '${card.maskedCardNumber}', '${card.cardHolderName}')"${!card.storedInRealvault ? ' disabled' : ''}>
+                    💳 Charge${!card.storedInRealvault ? ' (Disabled)' : ''}
                 </button>
                 <button class="btn-delete" onclick="deleteCard('${card.token}')">
                     🗑️ Delete
@@ -102,7 +104,12 @@ document.getElementById('addCardForm').addEventListener('submit', async function
         document.getElementById('addCardBtn').disabled = false;
         
         if (data.success) {
-            alert(`✅ Card saved successfully!\n\nToken: ${data.token}\nCard: ${data.maskedCardNumber}\nBrand: ${data.cardBrand}`);
+            // Update Realvault status
+            realvaultEnabled = data.realvaultEnabled || false;
+            updateStorageNote();
+            
+            const storageType = data.realvaultEnabled ? 'Realvault (secure)' : 'local storage (demo only)';
+            alert(`✅ Card saved successfully to ${storageType}!\n\nToken: ${data.token}\nCard: ${data.maskedCardNumber}\nBrand: ${data.cardBrand}`);
             
             // Reset form
             document.getElementById('addCardForm').reset();
@@ -118,6 +125,18 @@ document.getElementById('addCardForm').addEventListener('submit', async function
         alert(`Error: ${error.message}`);
     }
 });
+
+// Update storage note based on Realvault status
+function updateStorageNote() {
+    const noteElement = document.getElementById('noteText');
+    if (realvaultEnabled) {
+        noteElement.innerHTML = '🔒 <strong>Realvault Enabled:</strong> Cards are stored securely in Global Payments Realvault and can be charged.';
+        document.getElementById('storageNote').style.background = '#d4edda';
+        document.getElementById('storageNote').style.borderColor = '#28a745';
+    } else {
+        noteElement.innerHTML = 'Cards are saved for reference only. To enable charging stored cards, contact Global Payments to set up Realvault integration.';
+    }
+}
 
 // Open charge modal
 function openChargeModal(token, maskedCardNumber, cardHolderName) {
@@ -267,4 +286,5 @@ document.getElementById('chargeModal').addEventListener('click', function(e) {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadStoredCards();
+    updateStorageNote(); // Set initial note
 });

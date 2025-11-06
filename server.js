@@ -30,7 +30,10 @@ const config = {
   hppAccount: process.env.HPP_ACCOUNT,
   hppSharedSecret: process.env.HPP_SHARED_SECRET,
   hppSandboxUrl: process.env.HPP_SANDBOX_URL,
-  hppResponseUrl: process.env.HPP_RESPONSE_URL || 'http://localhost:3001/hpp-response'
+  hppResponseUrl: process.env.HPP_RESPONSE_URL || 'http://localhost:3001/hpp-response',
+  // Realvault configuration (optional - for card storage)
+  realvaultEnabled: process.env.REALVAULT_ENABLED === 'true',
+  realvaultAccount: process.env.REALVAULT_ACCOUNT || process.env.API_ACCOUNT
 };
 
 // Validate required environment variables
@@ -747,18 +750,88 @@ app.post('/store-card', async (req, res) => {
   console.log('\n=== Storing Card ===');
   console.log('Card Holder:', cardHolderName);
   console.log('Customer Email:', customerEmail);
+  console.log('Realvault Enabled:', config.realvaultEnabled);
   
   try {
-    // Generate card reference (token)
-    const token = `CARD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    let token, maskedCardNumber, cardBrand, payerRef;
     
-    // Mask card number
-    const maskedCardNumber = cardNumber.slice(0, 6) + '****' + cardNumber.slice(-4);
-    const cardBrand = getCardBrand(cardNumber);
+    if (config.realvaultEnabled) {
+      // Use Realvault to store card securely
+      console.log('Using Realvault for card storage...');
+      
+      // Generate unique payer reference
+      payerRef = `PAYER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const cardRef = `CARD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Build XML request for Realvault card storage
+      const timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
+      const orderId = `STORE-${Date.now()}`;
+      
+      // Create payer-new request to store card
+      const signature = `${timestamp}.${config.merchantId}.${orderId}..${payerRef}`;
+      const hash1 = crypto.createHash('sha1').update(signature).digest('hex');
+      const hash2 = crypto.createHash('sha1').update(`${hash1}.${config.sharedSecret}`).digest('hex');
+      
+      const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+<request type="card-new" timestamp="${timestamp}">
+  <merchantid>${config.merchantId}</merchantid>
+  <orderid>${orderId}</orderid>
+  <card>
+    <ref>${cardRef}</ref>
+    <payerref>${payerRef}</payerref>
+    <number>${cardNumber}</number>
+    <expdate>${expiryMonth}${expiryYear.slice(-2)}</expdate>
+    <chname>${cardHolderName}</chname>
+    <type>${getCardBrand(cardNumber)}</type>
+  </card>
+  <sha1hash>${hash2}</sha1hash>
+</request>`;
+
+      console.log('=== Realvault XML Request ===');
+      console.log(xmlRequest);
+      
+      // Send request to Global Payments
+      const response = await axios.post(config.apiUrl, xmlRequest, {
+        headers: {
+          'Content-Type': 'text/xml'
+        }
+      });
+      
+      console.log('=== Realvault XML Response ===');
+      console.log(response.data);
+      
+      // Parse response
+      const resultMatch = response.data.match(/<result>(.*?)<\/result>/);
+      const messageMatch = response.data.match(/<message>(.*?)<\/message>/);
+      const pasrefMatch = response.data.match(/<pasref>(.*?)<\/pasref>/);
+      
+      const resultCode = resultMatch ? resultMatch[1] : null;
+      const message = messageMatch ? messageMatch[1] : null;
+      const pasref = pasrefMatch ? pasrefMatch[1] : null;
+      
+      if (resultCode !== '00') {
+        throw new Error(`Realvault storage failed: ${message}`);
+      }
+      
+      token = cardRef;
+      maskedCardNumber = cardNumber.slice(0, 6) + '****' + cardNumber.slice(-4);
+      cardBrand = getCardBrand(cardNumber);
+      
+      console.log('✅ Card stored in Realvault:', cardRef);
+      console.log('Payer Reference:', payerRef);
+      
+    } else {
+      // Local storage fallback (for demo/testing without Realvault)
+      console.log('Realvault not enabled, using local storage...');
+      token = `CARD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      maskedCardNumber = cardNumber.slice(0, 6) + '****' + cardNumber.slice(-4);
+      cardBrand = getCardBrand(cardNumber);
+    }
     
-    // Store card details
+    // Store card metadata locally
     const cardData = {
       token: token,
+      payerRef: payerRef || null,
       maskedCardNumber: maskedCardNumber,
       cardBrand: cardBrand,
       cardHolderName: cardHolderName,
@@ -767,25 +840,26 @@ app.post('/store-card', async (req, res) => {
       customerEmail: customerEmail || 'N/A',
       createdAt: new Date().toISOString(),
       lastUsed: null,
-      // Store full card number encrypted (in production, use proper encryption!)
-      // For now, we'll re-use the card for future transactions
       cardNumberLast4: cardNumber.slice(-4),
       cardNumberFirst6: cardNumber.slice(0, 6),
-      // If pasRef provided from a transaction, store it
       pasRef: pasRef || null,
-      authCode: authCode || null
+      authCode: authCode || null,
+      storedInRealvault: config.realvaultEnabled
     };
     
     saveStoredCard(cardData);
     
-    console.log('✅ Card stored successfully:', token);
+    console.log('✅ Card metadata saved:', token);
     
     res.json({
       success: true,
-      message: 'Card stored successfully',
+      message: config.realvaultEnabled 
+        ? 'Card stored securely in Realvault' 
+        : 'Card stored locally (enable Realvault for secure storage)',
       token: token,
       maskedCardNumber: maskedCardNumber,
-      cardBrand: cardBrand
+      cardBrand: cardBrand,
+      realvaultEnabled: config.realvaultEnabled
     });
     
   } catch (error) {
@@ -804,6 +878,7 @@ app.post('/charge-stored-card', async (req, res) => {
   console.log('\n=== Charging Stored Card ===');
   console.log('Token:', token);
   console.log('Amount:', amount);
+  console.log('Realvault Enabled:', config.realvaultEnabled);
   
   try {
     // Find the stored card
@@ -817,18 +892,113 @@ app.post('/charge-stored-card', async (req, res) => {
       });
     }
     
-    // For stored card payments, we need to reconstruct the full card number
-    // In a real production system, you would:
-    // 1. Use Global Payments card storage/tokenization API
-    // 2. Or use a PCI-compliant vault service
-    // 3. Never store full card numbers unencrypted
+    if (!config.realvaultEnabled) {
+      return res.status(400).json({
+        success: false,
+        message: 'Stored card charging requires Global Payments Realvault integration. Please contact Global Payments support to enable card storage and tokenization for your merchant account.',
+        note: 'This is a limitation of the sandbox/demo environment. In production, you would use Global Payments Realvault or Card Storage API.'
+      });
+    }
     
-    // For this demo, we'll inform the user that stored card charging requires
-    // proper tokenization setup with Global Payments
-    return res.status(400).json({
-      success: false,
-      message: 'Stored card charging requires Global Payments Realvault integration. Please contact Global Payments support to enable card storage and tokenization for your merchant account.',
-      note: 'This is a limitation of the sandbox/demo environment. In production, you would use Global Payments Realvault or Card Storage API.'
+    if (!card.storedInRealvault || !card.payerRef) {
+      return res.status(400).json({
+        success: false,
+        message: 'This card was not stored in Realvault and cannot be charged. Please re-save the card with Realvault enabled.'
+      });
+    }
+    
+    // Use Realvault to charge the stored card
+    console.log('Charging card via Realvault...');
+    console.log('Payer Ref:', card.payerRef);
+    console.log('Card Ref:', card.token);
+    
+    const timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
+    const orderId = `CHARGE-${Date.now()}`;
+    const amountInCents = Math.round(amount * 100);
+    
+    // Build signature for receipt-in request
+    const signature = `${timestamp}.${config.merchantId}.${orderId}.${amountInCents}.${currency}.${card.payerRef}`;
+    const hash1 = crypto.createHash('sha1').update(signature).digest('hex');
+    const hash2 = crypto.createHash('sha1').update(`${hash1}.${config.sharedSecret}`).digest('hex');
+    
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+<request type="receipt-in" timestamp="${timestamp}">
+  <merchantid>${config.merchantId}</merchantid>
+  <account>${config.realvaultAccount}</account>
+  <orderid>${orderId}</orderid>
+  <amount currency="${currency}">${amountInCents}</amount>
+  <payerref>${card.payerRef}</payerref>
+  <paymentmethod>${card.token}</paymentmethod>
+  <autosettle flag="1"/>
+  <sha1hash>${hash2}</sha1hash>
+</request>`;
+
+    console.log('=== Realvault Charge XML Request ===');
+    console.log(xmlRequest);
+    
+    // Send request to Global Payments
+    const response = await axios.post(config.apiUrl, xmlRequest, {
+      headers: {
+        'Content-Type': 'text/xml'
+      }
+    });
+    
+    console.log('=== Realvault Charge XML Response ===');
+    console.log(response.data);
+    
+    // Parse response
+    const resultMatch = response.data.match(/<result>(.*?)<\/result>/);
+    const messageMatch = response.data.match(/<message>(.*?)<\/message>/);
+    const authCodeMatch = response.data.match(/<authcode>(.*?)<\/authcode>/);
+    const pasrefMatch = response.data.match(/<pasref>(.*?)<\/pasref>/);
+    
+    const resultCode = resultMatch ? resultMatch[1] : null;
+    const message = messageMatch ? messageMatch[1] : null;
+    const authCode = authCodeMatch ? authCodeMatch[1] : null;
+    const pasref = pasrefMatch ? pasrefMatch[1] : null;
+    
+    if (resultCode !== '00') {
+      return res.status(400).json({
+        success: false,
+        resultCode: resultCode,
+        message: message || 'Payment failed'
+      });
+    }
+    
+    // Update card last used timestamp
+    card.lastUsed = new Date().toISOString();
+    const allCards = cards.map(c => c.token === token ? card : c);
+    fs.writeFileSync(STORED_CARDS_FILE, JSON.stringify(allCards, null, 2));
+    
+    // Save transaction
+    const transaction = {
+      orderId: orderId,
+      amount: amount,
+      currency: currency,
+      resultCode: resultCode,
+      message: message,
+      authCode: authCode,
+      pasRef: pasref,
+      timestamp: new Date().toISOString(),
+      cardToken: token,
+      maskedCardNumber: card.maskedCardNumber,
+      success: true
+    };
+    
+    const transactions = loadTransactions();
+    transactions.unshift(transaction);
+    fs.writeFileSync(TRANSACTIONS_FILE, JSON.stringify(transactions, null, 2));
+    
+    console.log('✅ Stored card charged successfully');
+    
+    res.json({
+      success: true,
+      orderId: orderId,
+      amount: amount,
+      currency: currency,
+      authCode: authCode,
+      message: message,
+      maskedCardNumber: card.maskedCardNumber
     });
     
   } catch (error) {
