@@ -703,9 +703,6 @@ app.post('/generate-hpp-token', (req, res) => {
   console.log('Currency:', currency);
   console.log('Generated Hash:', signature);
   
-  // Extract base URL from response URL for HPP_POST_DIMENSIONS
-  const baseUrl = config.hppResponseUrl.replace('/hpp-response', '');
-  
   // Prepare HPP parameters - match exact structure of working HPP app
   const hppData = {
     TIMESTAMP: timestamp,
@@ -716,8 +713,6 @@ app.post('/generate-hpp-token', (req, res) => {
     CURRENCY: currency,
     AUTO_SETTLE_FLAG: '1',
     MERCHANT_RESPONSE_URL: config.hppResponseUrl,
-    HPP_POST_RESPONSE: config.hppResponseUrl,
-    HPP_POST_DIMENSIONS: baseUrl,
     HPP_VERSION: '2',
     SHA1HASH: signature,
     COMMENT1: 'Drop-In UI Payment',
