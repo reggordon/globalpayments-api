@@ -67,17 +67,10 @@ function displayTransactions(transactions) {
             currency: transaction.currency 
         }).format(transaction.amount);
         
-        // Check if refund button should be shown
-        const canRefund = transaction.success && 
-                         transaction.type !== 'refund' && 
-                         !transaction.refunded;
-        
-        let actionCell = '-';
-        if (canRefund) {
-            actionCell = `<button class="btn-refund" onclick="openRefundModal('${transaction.orderId}', ${transaction.amount}, '${transaction.currency}')">Refund</button>`;
-        } else if (transaction.refunded) {
-            actionCell = '<span style="color: #856404; font-size: 12px;">Refunded</span>';
-        }
+        // Add View Response button if rawResponse exists
+        const viewResponseBtn = transaction.rawResponse 
+            ? `<button class="btn-view" onclick="viewGatewayResponse('${transaction.orderId}')">📄 View Response</button>`
+            : '';
         
         row.innerHTML = `
             <td class="timestamp">${formattedDate}</td>
@@ -88,7 +81,7 @@ function displayTransactions(transactions) {
             <td>${transaction.cardHolderName}</td>
             <td>${transaction.authCode || '-'}</td>
             <td style="font-size: 13px;">${transaction.message}</td>
-            <td>${actionCell}</td>
+            <td>${viewResponseBtn}</td>
         `;
         
         tbody.appendChild(row);
@@ -192,6 +185,35 @@ async function processRefund() {
         console.error('Error processing refund:', error);
         alert(`Error: ${error.message}`);
     }
+}
+
+// Gateway response viewer
+function viewGatewayResponse(orderId) {
+    const transaction = allTransactions.find(t => t.orderId === orderId);
+    if (!transaction || !transaction.rawResponse) {
+        alert('Raw gateway response not available for this transaction.');
+        return;
+    }
+    
+    document.getElementById('responseOrderId').textContent = orderId;
+    document.getElementById('responseContent').textContent = transaction.rawResponse;
+    document.getElementById('responseModal').classList.add('active');
+}
+
+function closeResponseModal() {
+    document.getElementById('responseModal').classList.remove('active');
+}
+
+function copyResponse() {
+    const content = document.getElementById('responseContent').textContent;
+    navigator.clipboard.writeText(content).then(() => {
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 2000);
+    });
 }
 
 // Initialize on page load

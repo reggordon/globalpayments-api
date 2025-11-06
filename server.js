@@ -325,7 +325,8 @@ app.post('/process-payment', async (req, res) => {
       success: isSuccess,
       authCode: parsedResponse.authCode,
       pasRef: parsedResponse.pasRef,
-      account: config.account
+      account: config.account,
+      rawResponse: response.data  // Store raw XML response from gateway
     };
     
     saveTransaction(transaction);
