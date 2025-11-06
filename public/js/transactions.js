@@ -167,7 +167,7 @@ async function processRefund() {
     }
     
     try {
-        const response = await fetch('/process-refund', {
+        const response = await fetch('/refund', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
