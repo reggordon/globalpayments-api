@@ -803,7 +803,7 @@ app.post('/hpp-response', (req, res) => {
     valid: isValid
   });
   
-  // Redirect to result page with parameters
+  // Return HTML that redirects properly (works in iframe/lightbox/redirect scenarios)
   const params = new URLSearchParams({
     result: RESULT,
     message: MESSAGE,
@@ -815,7 +815,29 @@ app.post('/hpp-response', (req, res) => {
     currency: CURRENCY || ''
   });
   
-  res.redirect(`/hpp-result.html?${params.toString()}`);
+  const resultUrl = `/hpp-result.html?${params.toString()}`;
+  
+  // Return HTML that handles redirect in all contexts (iframe, lightbox, full page)
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Processing Payment...</title>
+    </head>
+    <body>
+      <script>
+        // If in iframe, redirect parent window
+        if (window.parent !== window) {
+          window.parent.location.href = '${resultUrl}';
+        } else {
+          // If full page redirect
+          window.location.href = '${resultUrl}';
+        }
+      </script>
+      <p>Processing payment result...</p>
+    </body>
+    </html>
+  `);
 });
 
 // Route: Handle HPP response (GET for testing)
