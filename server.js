@@ -785,7 +785,7 @@ app.post('/hpp-response', (req, res) => {
     orderId: ORDER_ID,
     timestamp: new Date().toISOString(),
     amount: AMOUNT ? parseFloat(AMOUNT) / 100 : 0,
-    currency: CURRENCY || 'N/A',
+    currency: CURRENCY || 'EUR',
     cardHolderName: 'HPP Payment',
     maskedCardNumber: 'N/A',
     resultCode: RESULT,

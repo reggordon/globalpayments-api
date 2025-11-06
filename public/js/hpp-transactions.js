@@ -46,40 +46,44 @@ function displayTransactions(transactions) {
     tbody.innerHTML = '';
     
     transactions.forEach(transaction => {
-        const row = document.createElement('tr');
-        
-        const date = new Date(transaction.timestamp || Date.now());
-        const formattedDate = date.toLocaleString();
-        
-        let statusClass = 'failed';
-        let statusText = 'Failed';
-        
-        if (transaction.success) {
-            statusClass = 'success';
-            statusText = 'Success';
+        try {
+            const row = document.createElement('tr');
+            
+            const date = new Date(transaction.timestamp || Date.now());
+            const formattedDate = date.toLocaleString();
+            
+            let statusClass = 'failed';
+            let statusText = 'Failed';
+            
+            if (transaction.success) {
+                statusClass = 'success';
+                statusText = 'Success';
+            }
+            
+            const amount = new Intl.NumberFormat('en-US', { 
+                style: 'currency', 
+                currency: (transaction.currency && transaction.currency !== 'N/A') ? transaction.currency : 'EUR' 
+            }).format(transaction.amount || 0);
+            
+            const signatureStatus = transaction.signatureValid 
+                ? '<span style="color: #28a745;">✓ Valid</span>' 
+                : '<span style="color: #dc3545;">✗ Invalid</span>';
+            
+            row.innerHTML = `
+                <td class="timestamp">${formattedDate}</td>
+                <td><code>${transaction.orderId}</code></td>
+                <td><span class="status ${statusClass}">${statusText}</span></td>
+                <td class="amount">${amount}</td>
+                <td>${transaction.authCode || '-'}</td>
+                <td style="font-size: 12px;">${transaction.pasRef || '-'}</td>
+                <td style="font-size: 13px;">${transaction.message || '-'}</td>
+                <td>${signatureStatus}</td>
+            `;
+            
+            tbody.appendChild(row);
+        } catch (error) {
+            console.error('Error displaying transaction:', transaction, error);
         }
-        
-        const amount = new Intl.NumberFormat('en-US', { 
-            style: 'currency', 
-            currency: transaction.currency || 'EUR' 
-        }).format(transaction.amount || 0);
-        
-        const signatureStatus = transaction.signatureValid 
-            ? '<span style="color: #28a745;">✓ Valid</span>' 
-            : '<span style="color: #dc3545;">✗ Invalid</span>';
-        
-        row.innerHTML = `
-            <td class="timestamp">${formattedDate}</td>
-            <td><code>${transaction.orderId}</code></td>
-            <td><span class="status ${statusClass}">${statusText}</span></td>
-            <td class="amount">${amount}</td>
-            <td>${transaction.authCode || '-'}</td>
-            <td style="font-size: 12px;">${transaction.pasRef || '-'}</td>
-            <td style="font-size: 13px;">${transaction.message}</td>
-            <td>${signatureStatus}</td>
-        `;
-        
-        tbody.appendChild(row);
     });
 }
 

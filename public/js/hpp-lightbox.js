@@ -167,7 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     AUTHCODE: event.data.authCode,
                     SHA1HASH: 'client-side', // Mark as client-side response
                     AMOUNT: event.data.amount ? Math.round(parseFloat(event.data.amount) * 100) : 0,
-                    CURRENCY: event.data.currency
+                    CURRENCY: event.data.currency || 'EUR' // Default to EUR if not provided
                 };
                 
                 handleHppResponse(response);
