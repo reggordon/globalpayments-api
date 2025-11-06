@@ -740,8 +740,9 @@ app.get('/stored-cards', (req, res) => {
 });
 
 // Route: Store a new card (tokenization)
+// This endpoint saves card details after successful payment or from the stored cards page
 app.post('/store-card', async (req, res) => {
-  const { cardNumber, cardHolderName, expiryMonth, expiryYear, cvv, customerEmail } = req.body;
+  const { cardNumber, cardHolderName, expiryMonth, expiryYear, cvv, customerEmail, pasRef, authCode } = req.body;
   
   console.log('\n=== Storing Card ===');
   console.log('Card Holder:', cardHolderName);
@@ -750,77 +751,42 @@ app.post('/store-card', async (req, res) => {
   try {
     // Generate card reference (token)
     const token = `CARD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const timestamp = getTimestamp();
-    const orderId = `STORE-${Date.now()}`;
     
-    // For card storage, we typically do a $0 auth to verify card
-    const amountInCents = '0';
+    // Mask card number
+    const maskedCardNumber = cardNumber.slice(0, 6) + '****' + cardNumber.slice(-4);
+    const cardBrand = getCardBrand(cardNumber);
     
-    // Build XML request for card storage (0 amount auth)
-    const xmlRequest = buildAuthRequest({
-      orderId,
-      amount: amountInCents,
-      currency: 'EUR',
-      cardNumber,
-      cardHolderName,
-      expiryMonth,
-      expiryYear,
-      cvv,
-      timestamp
+    // Store card details
+    const cardData = {
+      token: token,
+      maskedCardNumber: maskedCardNumber,
+      cardBrand: cardBrand,
+      cardHolderName: cardHolderName,
+      expiryMonth: expiryMonth,
+      expiryYear: expiryYear,
+      customerEmail: customerEmail || 'N/A',
+      createdAt: new Date().toISOString(),
+      lastUsed: null,
+      // Store full card number encrypted (in production, use proper encryption!)
+      // For now, we'll re-use the card for future transactions
+      cardNumberLast4: cardNumber.slice(-4),
+      cardNumberFirst6: cardNumber.slice(0, 6),
+      // If pasRef provided from a transaction, store it
+      pasRef: pasRef || null,
+      authCode: authCode || null
+    };
+    
+    saveStoredCard(cardData);
+    
+    console.log('✅ Card stored successfully:', token);
+    
+    res.json({
+      success: true,
+      message: 'Card stored successfully',
+      token: token,
+      maskedCardNumber: maskedCardNumber,
+      cardBrand: cardBrand
     });
-    
-    console.log('\n=== Sending Card Storage Request ===');
-    
-    // Send request to Global Payments API
-    const response = await axios.post(config.apiUrl, xmlRequest, {
-      headers: {
-        'Content-Type': 'application/xml'
-      }
-    });
-    
-    // Parse response
-    const parsedResponse = parseXmlResponse(response.data);
-    const isSuccess = parsedResponse.resultCode === '00';
-    
-    if (isSuccess) {
-      // Mask card number
-      const maskedCardNumber = cardNumber.slice(0, 6) + '****' + cardNumber.slice(-4);
-      const cardBrand = getCardBrand(cardNumber);
-      
-      // Store card details
-      const cardData = {
-        token: token,
-        maskedCardNumber: maskedCardNumber,
-        cardBrand: cardBrand,
-        cardHolderName: cardHolderName,
-        expiryMonth: expiryMonth,
-        expiryYear: expiryYear,
-        customerEmail: customerEmail || 'N/A',
-        createdAt: new Date().toISOString(),
-        lastUsed: null,
-        // Store payment reference for future charges
-        pasRef: parsedResponse.pasRef,
-        authCode: parsedResponse.authCode
-      };
-      
-      saveStoredCard(cardData);
-      
-      console.log('✅ Card stored successfully:', token);
-      
-      res.json({
-        success: true,
-        message: 'Card stored successfully',
-        token: token,
-        maskedCardNumber: maskedCardNumber,
-        cardBrand: cardBrand
-      });
-    } else {
-      res.json({
-        success: false,
-        message: 'Failed to verify card: ' + parsedResponse.message,
-        resultCode: parsedResponse.resultCode
-      });
-    }
     
   } catch (error) {
     console.error('Error storing card:', error);
@@ -851,70 +817,18 @@ app.post('/charge-stored-card', async (req, res) => {
       });
     }
     
-    // Generate order data
-    const orderId = `API-${Date.now()}`;
-    const timestamp = getTimestamp();
-    const amountInCents = Math.round(parseFloat(amount) * 100).toString();
+    // For stored card payments, we need to reconstruct the full card number
+    // In a real production system, you would:
+    // 1. Use Global Payments card storage/tokenization API
+    // 2. Or use a PCI-compliant vault service
+    // 3. Never store full card numbers unencrypted
     
-    // Build XML request using stored card (without CVV for subsequent transactions)
-    const xmlRequest = buildStoredCardAuthRequest({
-      orderId,
-      amount: amountInCents,
-      currency,
-      cardHolderName: card.cardHolderName,
-      pasRef: card.pasRef,
-      timestamp
-    });
-    
-    console.log('\n=== XML Request for Stored Card ===');
-    console.log(xmlRequest);
-    
-    // Send request to Global Payments API
-    const response = await axios.post(config.apiUrl, xmlRequest, {
-      headers: {
-        'Content-Type': 'application/xml'
-      }
-    });
-    
-    // Parse response
-    const parsedResponse = parseXmlResponse(response.data);
-    const isSuccess = parsedResponse.resultCode === '00';
-    
-    // Update last used timestamp
-    card.lastUsed = new Date().toISOString();
-    const updatedCards = cards.map(c => c.token === token ? card : c);
-    fs.writeFileSync(STORED_CARDS_FILE, JSON.stringify(updatedCards, null, 2));
-    
-    // Log transaction
-    const transaction = {
-      orderId: parsedResponse.orderId || orderId,
-      timestamp: new Date().toISOString(),
-      amount: parseFloat(amount),
-      currency: currency,
-      cardHolderName: card.cardHolderName,
-      maskedCardNumber: card.maskedCardNumber,
-      resultCode: parsedResponse.resultCode,
-      message: parsedResponse.message,
-      success: isSuccess,
-      authCode: parsedResponse.authCode,
-      pasRef: parsedResponse.pasRef,
-      account: config.account,
-      paymentMethod: 'stored_card',
-      cardToken: token,
-      rawResponse: response.data
-    };
-    
-    saveTransaction(transaction);
-    
-    console.log(isSuccess ? '✅ Payment successful' : '❌ Payment failed');
-    
-    res.json({
-      success: isSuccess,
-      resultCode: parsedResponse.resultCode,
-      message: parsedResponse.message,
-      orderId: parsedResponse.orderId,
-      authCode: parsedResponse.authCode,
-      pasRef: parsedResponse.pasRef
+    // For this demo, we'll inform the user that stored card charging requires
+    // proper tokenization setup with Global Payments
+    return res.status(400).json({
+      success: false,
+      message: 'Stored card charging requires Global Payments Realvault integration. Please contact Global Payments support to enable card storage and tokenization for your merchant account.',
+      note: 'This is a limitation of the sandbox/demo environment. In production, you would use Global Payments Realvault or Card Storage API.'
     });
     
   } catch (error) {

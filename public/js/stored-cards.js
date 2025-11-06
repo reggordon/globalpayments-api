@@ -51,7 +51,7 @@ function displayCards(cards) {
             </div>
             <div class="card-actions">
                 <button class="btn-charge" onclick="openChargeModal('${card.token}', '${card.maskedCardNumber}', '${card.cardHolderName}')">
-                    💳 Charge
+                    💳 Charge (Demo)
                 </button>
                 <button class="btn-delete" onclick="deleteCard('${card.token}')">
                     🗑️ Delete
@@ -187,11 +187,20 @@ document.getElementById('chargeForm').addEventListener('submit', async function(
             }, 3000);
         } else {
             result.className = 'result error';
-            resultTitle.textContent = '❌ Payment Failed';
-            resultDetails.innerHTML = `
-                <p><strong>Result Code:</strong> ${data.resultCode}</p>
-                <p><strong>Message:</strong> ${data.message}</p>
-            `;
+            resultTitle.textContent = data.message && data.message.includes('Realvault') ? 'ℹ️ Feature Not Available' : '❌ Payment Failed';
+            
+            if (data.message && data.message.includes('Realvault')) {
+                resultDetails.innerHTML = `
+                    <p><strong>Note:</strong> ${data.message}</p>
+                    ${data.note ? `<p>${data.note}</p>` : ''}
+                    <p style="margin-top: 15px; font-size: 0.9em;">To enable this feature, contact Global Payments to set up Realvault integration.</p>
+                `;
+            } else {
+                resultDetails.innerHTML = `
+                    <p><strong>Result Code:</strong> ${data.resultCode}</p>
+                    <p><strong>Message:</strong> ${data.message}</p>
+                `;
+            }
         }
         
         result.style.display = 'block';
