@@ -69,6 +69,11 @@ function displayTransactions(transactions) {
                 ? '<span style="color: #28a745;">✓ Valid</span>' 
                 : '<span style="color: #dc3545;">✗ Invalid</span>';
             
+            // Add View Response button if rawResponse exists
+            const viewResponseBtn = transaction.rawResponse 
+                ? `<button class="btn-view" onclick="viewGatewayResponse('${transaction.orderId}')">📄 View Response</button>`
+                : '-';
+            
             row.innerHTML = `
                 <td class="timestamp">${formattedDate}</td>
                 <td><code>${transaction.orderId}</code></td>
@@ -78,6 +83,7 @@ function displayTransactions(transactions) {
                 <td style="font-size: 12px;">${transaction.pasRef || '-'}</td>
                 <td style="font-size: 13px;">${transaction.message || '-'}</td>
                 <td>${signatureStatus}</td>
+                <td>${viewResponseBtn}</td>
             `;
             
             tbody.appendChild(row);
@@ -125,10 +131,46 @@ function exportToCSV() {
     window.URL.revokeObjectURL(url);
 }
 
+// Gateway response viewer
+function viewGatewayResponse(orderId) {
+    const transaction = allTransactions.find(t => t.orderId === orderId);
+    if (!transaction || !transaction.rawResponse) {
+        alert('Raw gateway response not available for this transaction.');
+        return;
+    }
+    
+    document.getElementById('responseOrderId').textContent = orderId;
+    document.getElementById('responseContent').textContent = transaction.rawResponse;
+    document.getElementById('responseModal').classList.add('active');
+}
+
+function closeResponseModal() {
+    document.getElementById('responseModal').classList.remove('active');
+}
+
+function copyResponse() {
+    const content = document.getElementById('responseContent').textContent;
+    navigator.clipboard.writeText(content).then(() => {
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => {
+            btn.textContent = originalText;
+        }, 2000);
+    });
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadStats();
     loadTransactions();
+    
+    // Close modal on background click
+    document.getElementById('responseModal')?.addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeResponseModal();
+        }
+    });
     
     // Note: Buttons use onclick attributes in HTML, so no event listeners needed here
     // The refreshData() and exportToCSV() functions are called directly from HTML

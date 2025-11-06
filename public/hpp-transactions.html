@@ -64,11 +64,32 @@
                         <th>Payment Ref</th>
                         <th>Message</th>
                         <th>Signature</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="transactionsBody">
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Gateway Response Modal -->
+    <div id="responseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Gateway Response</h2>
+                <button class="close-modal" onclick="closeResponseModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: #666; font-size: 14px; margin-bottom: 10px;">
+                    Order ID: <strong id="responseOrderId"></strong>
+                </p>
+                <pre id="responseContent" style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 12px;"></pre>
+            </div>
+            <div class="modal-footer">
+                <button onclick="copyResponse()">📋 Copy to Clipboard</button>
+                <button onclick="closeResponseModal()">Close</button>
+            </div>
         </div>
     </div>
 
