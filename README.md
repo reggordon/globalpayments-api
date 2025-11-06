@@ -24,6 +24,10 @@ npm start
 
 Open http://localhost:3001
 
+**📖 New to this?** See the detailed **[Local Setup Guide](./LOCAL_SETUP.md)** with step-by-step instructions for beginners.
+
+**☁️ Want to deploy?** See **[SETUP.md](./SETUP.md)** for production deployment options.
+
 ## What's Included
 
 ✅ **Direct API Integration**

@@ -13,10 +13,17 @@ This guide will help you set up and deploy this Global Payments integration with
 ### 1. Clone and Install
 
 ```bash
+# Clone the repository
 git clone https://github.com/reggordon/globalpayments-api.git
+
+# Navigate into the directory
 cd globalpayments-api
+
+# Install dependencies (requires Node.js 18+)
 npm install
 ```
+
+**Expected output**: You should see packages installing. Takes about 30-60 seconds.
 
 ### 2. Configure Environment
 
@@ -25,27 +32,40 @@ npm install
 cp .env.example .env
 ```
 
-Edit `.env` with your Global Payments credentials:
+Now open `.env` in your text editor:
+
+```bash
+# Use your preferred editor
+nano .env
+# or
+code .env
+# or
+open .env
+```
+
+Replace the placeholder values with **YOUR** Global Payments credentials:
 
 ```env
-# Server Configuration
+# Server Configuration (leave these as-is for local testing)
 PORT=3001
 NODE_ENV=development
 LOG_LEVEL=info
 
 # Global Payments API Credentials (Server-to-Server)
-API_MERCHANT_ID=your_api_merchant_id
-API_ACCOUNT=your_api_account
-API_SHARED_SECRET=your_api_shared_secret
+API_MERCHANT_ID=your_api_merchant_id        # 👈 Replace with your Merchant ID
+API_ACCOUNT=internet                        # 👈 Usually "internet", check your account
+API_SHARED_SECRET=your_api_shared_secret    # 👈 Replace with your Secret
 API_URL=https://api.sandbox.realexpayments.com/epage-remote.cgi
 
 # Global Payments HPP Credentials (Hosted Payment Page)
-HPP_MERCHANT_ID=your_hpp_merchant_id
-HPP_ACCOUNT=your_hpp_account
-HPP_SHARED_SECRET=your_hpp_shared_secret
+HPP_MERCHANT_ID=your_hpp_merchant_id        # 👈 Replace with your HPP Merchant ID
+HPP_ACCOUNT=internet                        # 👈 Usually "internet"
+HPP_SHARED_SECRET=your_hpp_shared_secret    # 👈 Replace with your HPP Secret
 HPP_SANDBOX_URL=https://pay.sandbox.realexpayments.com/pay
-HPP_RESPONSE_URL=http://localhost:3001/hpp-response
+HPP_RESPONSE_URL=http://localhost:3001/hpp-response  # 👈 Leave this as-is for local
 ```
+
+💡 **Tip**: API and HPP credentials are often different! Check your Global Payments dashboard for both.
 
 ### 3. Start the Server
 
@@ -53,7 +73,27 @@ HPP_RESPONSE_URL=http://localhost:3001/hpp-response
 npm start
 ```
 
-Visit http://localhost:3001 to test the integration.
+**Expected output**:
+```
+Global Payments API Server running on http://localhost:3001
+Environment: development
+Configuration loaded from environment variables
+  API Merchant ID: your_merchant_id
+  API Account: internet
+  HPP Merchant ID: your_hpp_merchant_id
+  HPP Account: internet
+```
+
+✅ If you see this, you're ready to go!
+
+### 4. Test the Integration
+
+Open your browser to: **http://localhost:3001**
+
+You should see the main payment page with links to:
+- Direct API Payment (`/index.html`)
+- HPP Options (`/hpp-options.html`)
+- Transaction History (`/transactions.html` and `/hpp-transactions.html`)
 
 ## Getting Your Global Payments Credentials
 
@@ -140,18 +180,93 @@ Then redeploy:
 
 ### Test Cards (Sandbox)
 
-| Card Number          | Result    | CVV | Expiry    |
-|---------------------|-----------|-----|-----------|
-| 4263970000005262    | Success   | 123 | Any future |
-| 4000120000001154    | Declined  | 123 | Any future |
+Use these test card numbers in the sandbox environment:
+
+| Card Number          | Result    | CVV | Expiry         | Use Case                    |
+|---------------------|-----------|-----|----------------|----------------------------|
+| 4263970000005262    | Success   | 123 | Any future date | Test successful payment    |
+| 4000120000001154    | Declined  | 123 | Any future date | Test declined payment      |
+| 4012001037141112    | Success   | 123 | Any future date | Alternative success card   |
+
+**Expiry Date**: Use any future date (e.g., 12/2026)  
+**CVV**: Use 123 for all test cards  
+**Cardholder Name**: Use any name
 
 ### Test Workflow
 
-1. **API Payment**: Visit `/index.html` → Enter test card → Process payment
-2. **HPP Lightbox**: Visit `/hpp-lightbox.html` → Complete payment
-3. **View Transactions**: 
-   - API: `/transactions.html`
-   - HPP: `/hpp-transactions.html`
+#### Option 1: Direct API Payment
+1. Go to http://localhost:3001/index.html
+2. Fill in the form:
+   - Amount: 10.00
+   - Card Number: 4263970000005262
+   - Expiry: 12/26
+   - CVV: 123
+   - Name: Test User
+3. Click "Process Payment"
+4. You should see "✅ Payment Successful!"
+5. View the transaction at http://localhost:3001/transactions.html
+
+#### Option 2: HPP Lightbox
+1. Go to http://localhost:3001/hpp-lightbox.html
+2. Enter amount: 10.00
+3. Click "Pay with Lightbox"
+4. In the popup:
+   - Card Number: 4263970000005262
+   - Expiry: 12/26
+   - CVV: 123
+   - Name: Test User
+5. Complete payment
+6. View at http://localhost:3001/hpp-transactions.html
+
+#### Option 3: HPP Redirect
+1. Go to http://localhost:3001/hpp-redirect.html
+2. Enter amount and click "Pay with Redirect"
+3. You'll be taken to Global Payments page
+4. Enter test card details
+5. Complete payment
+6. ⚠️ **Note**: Redirect back may show 404 in sandbox (known issue)
+7. Transaction is still saved! Check http://localhost:3001/hpp-transactions.html
+
+### Verify Everything Works
+
+✅ **Checklist**:
+- [ ] Server starts without errors
+- [ ] Can access http://localhost:3001
+- [ ] Direct API payment succeeds
+- [ ] HPP Lightbox payment succeeds
+- [ ] Transactions appear in history
+- [ ] Can export transactions to CSV
+- [ ] Can view raw gateway responses
+
+### Common Issues During Local Testing
+
+#### "No such merchant id" (Error 504)
+- **Cause**: Wrong credentials or using HPP credentials for API (or vice versa)
+- **Fix**: 
+  1. Double-check you copied credentials correctly
+  2. Verify you're using API credentials for Direct API
+  3. Verify you're using HPP credentials for HPP pages
+  4. Contact developer@globalpay.com to verify API access
+
+#### "Connection refused"
+- **Cause**: Server not running or wrong port
+- **Fix**: Make sure `npm start` is running and you're using port 3001
+
+#### "Cannot find module"
+- **Cause**: Dependencies not installed
+- **Fix**: Run `npm install` again
+
+#### Transactions not saving
+- **Cause**: File permissions or data directory doesn't exist
+- **Fix**: 
+  ```bash
+  mkdir -p data
+  chmod -R 755 data
+  ```
+
+#### HPP shows blank page
+- **Cause**: CORS or incorrect HPP URL
+- **Fix**: Check console for errors, verify HPP_SANDBOX_URL in .env
 
 ## File Structure
 
