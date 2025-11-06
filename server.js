@@ -713,6 +713,8 @@ app.post('/generate-hpp-token', (req, res) => {
     CURRENCY: currency,
     AUTO_SETTLE_FLAG: '1',
     MERCHANT_RESPONSE_URL: config.hppResponseUrl,
+    HPP_POST_RESPONSE: config.hppResponseUrl,
+    HPP_POST_DIMENSIONS: 'https://globalpayments-api-qc7fzojfua-uc.a.run.app',
     HPP_VERSION: '2',
     SHA1HASH: signature,
     COMMENT1: 'Drop-In UI Payment',
