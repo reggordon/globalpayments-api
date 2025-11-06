@@ -1188,6 +1188,9 @@ app.post('/hpp-response', (req, res) => {
   console.log('Signature Valid:', isValid);
   logger.info('HPP signature validation', { isValid, result: RESULT });
   
+  // Create raw response string for debugging
+  const rawResponse = JSON.stringify(req.body, null, 2);
+  
   // Log transaction - save ALL HPP transactions, not just successful ones
   const transaction = {
     orderId: ORDER_ID,
@@ -1203,7 +1206,8 @@ app.post('/hpp-response', (req, res) => {
     pasRef: PASREF || '',
     account: config.hppAccount,
     type: 'hpp',
-    signatureValid: isValid
+    signatureValid: isValid,
+    rawResponse: rawResponse
   };
   
   console.log('Saving HPP transaction:', JSON.stringify(transaction, null, 2));
@@ -1282,6 +1286,9 @@ app.get('/hpp-response', (req, res) => {
   console.log('Signature Valid:', isValid);
   logger.info('HPP signature validation (GET)', { isValid, result: RESULT });
   
+  // Create raw response string for debugging
+  const rawResponse = JSON.stringify(req.query, null, 2);
+  
   // Log transaction - save ALL HPP transactions, not just successful ones
   const transaction = {
     orderId: ORDER_ID,
@@ -1297,7 +1304,8 @@ app.get('/hpp-response', (req, res) => {
     pasRef: PASREF || '',
     account: config.hppAccount,
     type: 'hpp',
-    signatureValid: isValid
+    signatureValid: isValid,
+    rawResponse: rawResponse
   };
   
   saveTransaction(transaction);
