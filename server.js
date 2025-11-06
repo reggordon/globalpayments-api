@@ -801,7 +801,7 @@ app.post('/hpp-response', (req, res) => {
     valid: isValid
   });
   
-  // Return HTML that redirects properly (works in iframe/lightbox/redirect scenarios)
+  // Build result URL with parameters
   const params = new URLSearchParams({
     result: RESULT,
     message: MESSAGE,
@@ -815,24 +815,17 @@ app.post('/hpp-response', (req, res) => {
   
   const resultUrl = `/hpp-result.html?${params.toString()}`;
   
-  // Return HTML that handles redirect in all contexts (iframe, lightbox, full page)
+  // Return simple HTML with meta redirect (more compatible with HPP)
   res.send(`
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Processing Payment...</title>
+      <meta http-equiv="refresh" content="0;url=${resultUrl}">
+      <title>Payment Complete</title>
     </head>
     <body>
-      <script>
-        // If in iframe, redirect parent window
-        if (window.parent !== window) {
-          window.parent.location.href = '${resultUrl}';
-        } else {
-          // If full page redirect
-          window.location.href = '${resultUrl}';
-        }
-      </script>
-      <p>Processing payment result...</p>
+      <p>Payment processed. Redirecting...</p>
+      <script>window.location.href = '${resultUrl}';</script>
     </body>
     </html>
   `);
@@ -900,7 +893,7 @@ app.get('/hpp-response', (req, res) => {
     valid: isValid
   });
   
-  // Redirect to result page with parameters
+  // Return HTML that redirects properly (same as POST handler)
   const params = new URLSearchParams({
     result: RESULT,
     message: MESSAGE,
@@ -912,7 +905,29 @@ app.get('/hpp-response', (req, res) => {
     currency: CURRENCY || ''
   });
   
-  res.redirect(`/hpp-result.html?${params.toString()}`);
+  const resultUrl = `/hpp-result.html?${params.toString()}`;
+  
+  // Return HTML that handles redirect in all contexts
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Processing Payment...</title>
+    </head>
+    <body>
+      <script>
+        // If in iframe, redirect parent window
+        if (window.parent !== window) {
+          window.parent.location.href = '${resultUrl}';
+        } else {
+          // If full page redirect
+          window.location.href = '${resultUrl}';
+        }
+      </script>
+      <p>Processing payment result...</p>
+    </body>
+    </html>
+  `);
 });
 
 // Start server
