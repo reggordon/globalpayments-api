@@ -12,6 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const TRANSACTIONS_FILE = path.join(__dirname, 'data', 'transactions.json');
 const HPP_TRANSACTIONS_FILE = path.join(__dirname, 'data', 'hpp-transactions.json');
+const STORED_CARDS_FILE = path.join(__dirname, 'data', 'stored-cards.json');
 
 // Middleware
 app.use(bodyParser.json());
@@ -29,7 +30,10 @@ const config = {
   hppAccount: process.env.HPP_ACCOUNT,
   hppSharedSecret: process.env.HPP_SHARED_SECRET,
   hppSandboxUrl: process.env.HPP_SANDBOX_URL,
-  hppResponseUrl: process.env.HPP_RESPONSE_URL || 'http://localhost:3001/hpp-response'
+  hppResponseUrl: process.env.HPP_RESPONSE_URL || 'http://localhost:3001/hpp-response',
+  // Realvault configuration (optional - for card storage)
+  realvaultEnabled: process.env.REALVAULT_ENABLED === 'true',
+  realvaultAccount: process.env.REALVAULT_ACCOUNT || process.env.API_ACCOUNT
 };
 
 // Validate required environment variables
@@ -109,6 +113,44 @@ function saveHppTransaction(transaction) {
   }
 }
 
+// Stored Cards helper functions
+function loadStoredCards() {
+  try {
+    const data = fs.readFileSync(STORED_CARDS_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error loading stored cards:', error);
+    return [];
+  }
+}
+
+function saveStoredCard(cardData) {
+  try {
+    const cards = loadStoredCards();
+    cards.unshift(cardData); // Add to beginning
+    
+    fs.writeFileSync(STORED_CARDS_FILE, JSON.stringify(cards, null, 2));
+    console.log('Stored card saved:', cardData.token);
+    return true;
+  } catch (error) {
+    console.error('Error saving stored card:', error);
+    return false;
+  }
+}
+
+function deleteStoredCard(token) {
+  try {
+    let cards = loadStoredCards();
+    cards = cards.filter(card => card.token !== token);
+    fs.writeFileSync(STORED_CARDS_FILE, JSON.stringify(cards, null, 2));
+    console.log('Stored card deleted:', token);
+    return true;
+  } catch (error) {
+    console.error('Error deleting stored card:', error);
+    return false;
+  }
+}
+
 // Helper function to generate timestamp
 function getTimestamp() {
   const now = new Date();
@@ -146,6 +188,12 @@ function generateSignature(timestamp, merchantId, orderId, amount, currency, car
 function buildAuthRequest(orderData) {
   const { orderId, amount, currency, cardNumber, cardHolderName, expiryMonth, expiryYear, cvv, timestamp } = orderData;
   
+  // Ensure expiryYear is only 2 digits (convert 2025 -> 25)
+  const yearTwoDigits = expiryYear.length > 2 ? expiryYear.slice(-2) : expiryYear;
+  
+  // Ensure expiryMonth is 2 digits with leading zero
+  const monthTwoDigits = expiryMonth.padStart(2, '0');
+  
   const signature = generateSignature(
     timestamp,
     config.merchantId,
@@ -163,7 +211,7 @@ function buildAuthRequest(orderData) {
   <amount currency="${currency}">${amount}</amount>
   <card>
     <number>${cardNumber}</number>
-    <expdate>${expiryMonth}${expiryYear}</expdate>
+    <expdate>${monthTwoDigits}${yearTwoDigits}</expdate>
     <chname>${cardHolderName}</chname>
     <type>VISA</type>
     <cvn>
@@ -213,6 +261,52 @@ function buildRefundRequest(refundData) {
   <refundhash>${signature}</refundhash>
   <sha1hash>${signature}</sha1hash>
 </request>`;
+}
+
+// Helper function to build stored card auth request
+function buildStoredCardAuthRequest(orderData) {
+  const { orderId, amount, currency, cardHolderName, pasRef, timestamp } = orderData;
+  
+  // For stored card transactions, signature is simpler (no card number)
+  const step1 = `${timestamp}.${config.merchantId}.${orderId}.${amount}.${currency}`;
+  const hash1 = generateSha1Hash(step1);
+  const signature = generateSha1Hash(`${hash1}.${config.sharedSecret}`);
+  
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<request type="receipt-in" timestamp="${timestamp}">
+  <merchantid>${config.merchantId}</merchantid>
+  <account>${config.account}</account>
+  <orderid>${orderId}</orderid>
+  <amount currency="${currency}">${amount}</amount>
+  <payerref>${pasRef}</payerref>
+  <paymentmethod>${pasRef}</paymentmethod>
+  <autosettle flag="1"/>
+  <sha1hash>${signature}</sha1hash>
+</request>`;
+}
+
+// Helper function to detect card brand from card number
+function getCardBrand(cardNumber) {
+  const firstDigit = cardNumber.charAt(0);
+  const firstTwoDigits = cardNumber.substring(0, 2);
+  const firstFourDigits = cardNumber.substring(0, 4);
+  
+  if (firstDigit === '4') {
+    return 'Visa';
+  } else if (parseInt(firstTwoDigits) >= 51 && parseInt(firstTwoDigits) <= 55) {
+    return 'Mastercard';
+  } else if (firstTwoDigits === '34' || firstTwoDigits === '37') {
+    return 'American Express';
+  } else if (firstFourDigits === '6011' || firstTwoDigits === '65') {
+    return 'Discover';
+  } else if (parseInt(firstFourDigits) >= 3528 && parseInt(firstFourDigits) <= 3589) {
+    return 'JCB';
+  } else if (firstFourDigits === '3000' || firstFourDigits === '3095' || 
+             parseInt(firstTwoDigits) >= 36 && parseInt(firstTwoDigits) <= 39) {
+    return 'Diners Club';
+  } else {
+    return 'Unknown';
+  }
 }
 
 // Helper function to parse XML response
@@ -624,6 +718,320 @@ app.get('/hpp-transactions/stats', (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to load HPP stats: ' + error.message
+    });
+  }
+});
+
+// ========================================
+// Stored Cards / Card Tokenization
+// ========================================
+
+// Route: Get all stored cards
+app.get('/stored-cards', (req, res) => {
+  try {
+    const cards = loadStoredCards();
+    res.json({
+      success: true,
+      cards: cards
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load stored cards: ' + error.message
+    });
+  }
+});
+
+// Route: Store a new card (tokenization)
+// This endpoint saves card details after successful payment or from the stored cards page
+app.post('/store-card', async (req, res) => {
+  const { cardNumber, cardHolderName, expiryMonth, expiryYear, cvv, customerEmail, pasRef, authCode } = req.body;
+  
+  console.log('\n=== Storing Card ===');
+  console.log('Card Holder:', cardHolderName);
+  console.log('Customer Email:', customerEmail);
+  console.log('Realvault Enabled:', config.realvaultEnabled);
+  
+  try {
+    let token, maskedCardNumber, cardBrand, payerRef;
+    
+    if (config.realvaultEnabled) {
+      // Use Realvault to store card securely
+      console.log('Using Realvault for card storage...');
+      
+      // Generate unique payer reference
+      payerRef = `PAYER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const cardRef = `CARD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Build XML request for Realvault card storage
+      const timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
+      const orderId = `STORE-${Date.now()}`;
+      
+      // Create payer-new request to store card
+      const signature = `${timestamp}.${config.merchantId}.${orderId}..${payerRef}`;
+      const hash1 = crypto.createHash('sha1').update(signature).digest('hex');
+      const hash2 = crypto.createHash('sha1').update(`${hash1}.${config.sharedSecret}`).digest('hex');
+      
+      const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+<request type="card-new" timestamp="${timestamp}">
+  <merchantid>${config.merchantId}</merchantid>
+  <orderid>${orderId}</orderid>
+  <card>
+    <ref>${cardRef}</ref>
+    <payerref>${payerRef}</payerref>
+    <number>${cardNumber}</number>
+    <expdate>${expiryMonth}${expiryYear.slice(-2)}</expdate>
+    <chname>${cardHolderName}</chname>
+    <type>${getCardBrand(cardNumber)}</type>
+  </card>
+  <sha1hash>${hash2}</sha1hash>
+</request>`;
+
+      console.log('=== Realvault XML Request ===');
+      console.log(xmlRequest);
+      
+      // Send request to Global Payments
+      const response = await axios.post(config.apiUrl, xmlRequest, {
+        headers: {
+          'Content-Type': 'text/xml'
+        }
+      });
+      
+      console.log('=== Realvault XML Response ===');
+      console.log(response.data);
+      
+      // Parse response
+      const resultMatch = response.data.match(/<result>(.*?)<\/result>/);
+      const messageMatch = response.data.match(/<message>(.*?)<\/message>/);
+      const pasrefMatch = response.data.match(/<pasref>(.*?)<\/pasref>/);
+      
+      const resultCode = resultMatch ? resultMatch[1] : null;
+      const message = messageMatch ? messageMatch[1] : null;
+      const pasref = pasrefMatch ? pasrefMatch[1] : null;
+      
+      if (resultCode !== '00') {
+        throw new Error(`Realvault storage failed: ${message}`);
+      }
+      
+      token = cardRef;
+      maskedCardNumber = cardNumber.slice(0, 6) + '****' + cardNumber.slice(-4);
+      cardBrand = getCardBrand(cardNumber);
+      
+      console.log('✅ Card stored in Realvault:', cardRef);
+      console.log('Payer Reference:', payerRef);
+      
+    } else {
+      // Local storage fallback (for demo/testing without Realvault)
+      console.log('Realvault not enabled, using local storage...');
+      token = `CARD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      maskedCardNumber = cardNumber.slice(0, 6) + '****' + cardNumber.slice(-4);
+      cardBrand = getCardBrand(cardNumber);
+    }
+    
+    // Store card metadata locally
+    const cardData = {
+      token: token,
+      payerRef: payerRef || null,
+      maskedCardNumber: maskedCardNumber,
+      cardBrand: cardBrand,
+      cardHolderName: cardHolderName,
+      expiryMonth: expiryMonth,
+      expiryYear: expiryYear,
+      customerEmail: customerEmail || 'N/A',
+      createdAt: new Date().toISOString(),
+      lastUsed: null,
+      cardNumberLast4: cardNumber.slice(-4),
+      cardNumberFirst6: cardNumber.slice(0, 6),
+      pasRef: pasRef || null,
+      authCode: authCode || null,
+      storedInRealvault: config.realvaultEnabled
+    };
+    
+    saveStoredCard(cardData);
+    
+    console.log('✅ Card metadata saved:', token);
+    
+    res.json({
+      success: true,
+      message: config.realvaultEnabled 
+        ? 'Card stored securely in Realvault' 
+        : 'Card stored locally (enable Realvault for secure storage)',
+      token: token,
+      maskedCardNumber: maskedCardNumber,
+      cardBrand: cardBrand,
+      realvaultEnabled: config.realvaultEnabled
+    });
+    
+  } catch (error) {
+    console.error('Error storing card:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to store card: ' + error.message
+    });
+  }
+});
+
+// Route: Charge a stored card
+app.post('/charge-stored-card', async (req, res) => {
+  const { token, amount, currency } = req.body;
+  
+  console.log('\n=== Charging Stored Card ===');
+  console.log('Token:', token);
+  console.log('Amount:', amount);
+  console.log('Realvault Enabled:', config.realvaultEnabled);
+  
+  try {
+    // Find the stored card
+    const cards = loadStoredCards();
+    const card = cards.find(c => c.token === token);
+    
+    if (!card) {
+      return res.status(404).json({
+        success: false,
+        message: 'Card not found'
+      });
+    }
+    
+    if (!config.realvaultEnabled) {
+      return res.status(400).json({
+        success: false,
+        message: 'Stored card charging requires Global Payments Realvault integration. Please contact Global Payments support to enable card storage and tokenization for your merchant account.',
+        note: 'This is a limitation of the sandbox/demo environment. In production, you would use Global Payments Realvault or Card Storage API.'
+      });
+    }
+    
+    if (!card.storedInRealvault || !card.payerRef) {
+      return res.status(400).json({
+        success: false,
+        message: 'This card was not stored in Realvault and cannot be charged. Please re-save the card with Realvault enabled.'
+      });
+    }
+    
+    // Use Realvault to charge the stored card
+    console.log('Charging card via Realvault...');
+    console.log('Payer Ref:', card.payerRef);
+    console.log('Card Ref:', card.token);
+    
+    const timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
+    const orderId = `CHARGE-${Date.now()}`;
+    const amountInCents = Math.round(amount * 100);
+    
+    // Build signature for receipt-in request
+    const signature = `${timestamp}.${config.merchantId}.${orderId}.${amountInCents}.${currency}.${card.payerRef}`;
+    const hash1 = crypto.createHash('sha1').update(signature).digest('hex');
+    const hash2 = crypto.createHash('sha1').update(`${hash1}.${config.sharedSecret}`).digest('hex');
+    
+    const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
+<request type="receipt-in" timestamp="${timestamp}">
+  <merchantid>${config.merchantId}</merchantid>
+  <account>${config.realvaultAccount}</account>
+  <orderid>${orderId}</orderid>
+  <amount currency="${currency}">${amountInCents}</amount>
+  <payerref>${card.payerRef}</payerref>
+  <paymentmethod>${card.token}</paymentmethod>
+  <autosettle flag="1"/>
+  <sha1hash>${hash2}</sha1hash>
+</request>`;
+
+    console.log('=== Realvault Charge XML Request ===');
+    console.log(xmlRequest);
+    
+    // Send request to Global Payments
+    const response = await axios.post(config.apiUrl, xmlRequest, {
+      headers: {
+        'Content-Type': 'text/xml'
+      }
+    });
+    
+    console.log('=== Realvault Charge XML Response ===');
+    console.log(response.data);
+    
+    // Parse response
+    const resultMatch = response.data.match(/<result>(.*?)<\/result>/);
+    const messageMatch = response.data.match(/<message>(.*?)<\/message>/);
+    const authCodeMatch = response.data.match(/<authcode>(.*?)<\/authcode>/);
+    const pasrefMatch = response.data.match(/<pasref>(.*?)<\/pasref>/);
+    
+    const resultCode = resultMatch ? resultMatch[1] : null;
+    const message = messageMatch ? messageMatch[1] : null;
+    const authCode = authCodeMatch ? authCodeMatch[1] : null;
+    const pasref = pasrefMatch ? pasrefMatch[1] : null;
+    
+    if (resultCode !== '00') {
+      return res.status(400).json({
+        success: false,
+        resultCode: resultCode,
+        message: message || 'Payment failed'
+      });
+    }
+    
+    // Update card last used timestamp
+    card.lastUsed = new Date().toISOString();
+    const allCards = cards.map(c => c.token === token ? card : c);
+    fs.writeFileSync(STORED_CARDS_FILE, JSON.stringify(allCards, null, 2));
+    
+    // Save transaction
+    const transaction = {
+      orderId: orderId,
+      amount: amount,
+      currency: currency,
+      resultCode: resultCode,
+      message: message,
+      authCode: authCode,
+      pasRef: pasref,
+      timestamp: new Date().toISOString(),
+      cardToken: token,
+      maskedCardNumber: card.maskedCardNumber,
+      success: true
+    };
+    
+    const transactions = loadTransactions();
+    transactions.unshift(transaction);
+    fs.writeFileSync(TRANSACTIONS_FILE, JSON.stringify(transactions, null, 2));
+    
+    console.log('✅ Stored card charged successfully');
+    
+    res.json({
+      success: true,
+      orderId: orderId,
+      amount: amount,
+      currency: currency,
+      authCode: authCode,
+      message: message,
+      maskedCardNumber: card.maskedCardNumber
+    });
+    
+  } catch (error) {
+    console.error('Error charging stored card:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to charge stored card: ' + error.message
+    });
+  }
+});
+
+// Route: Delete a stored card
+app.delete('/stored-cards/:token', (req, res) => {
+  const { token } = req.params;
+  
+  try {
+    const success = deleteStoredCard(token);
+    
+    if (success) {
+      res.json({
+        success: true,
+        message: 'Card deleted successfully'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to delete card'
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete card: ' + error.message
     });
   }
 });

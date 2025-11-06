@@ -6,5 +6,6 @@ config.json
 npm-debug.log*
 data/transactions.json
 data/hpp-transactions.json
+data/stored-cards.json
 logs/
 *.log

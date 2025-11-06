@@ -47,6 +47,13 @@ Open http://localhost:3001
 - View raw gateway responses for debugging
 - Real-time statistics dashboard
 
+✅ **Card Storage** (Realvault Integration)
+- Secure card tokenization
+- Save cards for future use
+- Charge stored cards
+- PCI-compliant storage via Global Payments Realvault
+- See **[REALVAULT.md](./REALVAULT.md)** for setup
+
 ✅ **Production Ready**
 - Automated Google Cloud Run deployment
 - Environment-based configuration

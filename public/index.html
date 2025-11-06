@@ -12,6 +12,7 @@
         <p class="subtitle">Direct API Integration - Sandbox</p>
 
         <div class="nav-link">
+            <a href="/stored-cards.html">💳 Stored Cards</a>
             <a href="/hpp-options.html">🔐 HPP Integration Options</a>
             <a href="/dropin.html">🎨 Try Drop-In UI</a>
             <a href="/transactions.html">📊 View Transaction History</a>
@@ -87,6 +88,16 @@
                         <input type="text" id="cvv" name="cvv" placeholder="123" maxlength="3" required>
                     </div>
                 </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 20px;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="saveCard" name="saveCard" style="margin-right: 10px; width: 18px; height: 18px; cursor: pointer;">
+                    <span>💾 Save this card for future payments</span>
+                </label>
+                <small style="color: #666; margin-left: 28px; display: block; margin-top: 5px;">
+                    Card will be securely stored for faster checkout
+                </small>
             </div>
 
             <button type="submit" id="submitBtn">Process Payment</button>
