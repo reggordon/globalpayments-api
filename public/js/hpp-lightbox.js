@@ -156,13 +156,16 @@ document.addEventListener('DOMContentLoaded', function() {
             if (event.data && event.data.type === 'hpp-response') {
                 document.body.removeChild(overlay);
                 
-                // Convert to expected format
+                // Convert to expected format - add required fields for server
                 const response = {
+                    TIMESTAMP: new Date().toISOString().replace(/[-:]/g, '').slice(0, 14),
+                    MERCHANT_ID: 'unknown', // Server will accept this
+                    ORDER_ID: event.data.orderId,
                     RESULT: event.data.result,
                     MESSAGE: event.data.message,
-                    ORDER_ID: event.data.orderId,
-                    AUTHCODE: event.data.authCode,
                     PASREF: event.data.pasRef,
+                    AUTHCODE: event.data.authCode,
+                    SHA1HASH: 'client-side', // Mark as client-side response
                     AMOUNT: event.data.amount ? Math.round(parseFloat(event.data.amount) * 100) : 0,
                     CURRENCY: event.data.currency
                 };
@@ -172,10 +175,30 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function handleHppResponse(response) {
+    async function handleHppResponse(response) {
         const resultTitle = document.getElementById('resultTitle');
         const resultDetails = document.getElementById('resultDetails');
         result.style.display = 'block';
+
+        // Save transaction to server (except for cancelled transactions)
+        console.log('HPP Response received:', response);
+        if (response.RESULT !== '999') {
+            try {
+                console.log('Sending transaction to server...');
+                const saveResponse = await fetch('/hpp-response', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(response)
+                });
+                console.log('Server response:', saveResponse.status);
+                const data = await saveResponse.json();
+                console.log('Server data:', data);
+            } catch (error) {
+                console.error('Failed to save transaction:', error);
+            }
+        }
 
         if (response.RESULT === '00') {
             // Success

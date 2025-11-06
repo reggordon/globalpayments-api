@@ -3,7 +3,7 @@ let allTransactions = [];
 
 async function loadStats() {
     try {
-        const response = await fetch('/hpp-transactions/stats');
+        const response = await fetch('/hpp-transactions/stats?t=' + Date.now());
         const data = await response.json();
         
         if (data.success) {
@@ -20,7 +20,7 @@ async function loadStats() {
 
 async function loadTransactions() {
     try {
-        const response = await fetch('/hpp-transactions?limit=100');
+        const response = await fetch('/hpp-transactions?limit=100&t=' + Date.now());
         const data = await response.json();
         
         if (data.success) {
@@ -48,7 +48,7 @@ function displayTransactions(transactions) {
     transactions.forEach(transaction => {
         const row = document.createElement('tr');
         
-        const date = new Date(transaction.timestamp);
+        const date = new Date(transaction.timestamp || Date.now());
         const formattedDate = date.toLocaleString();
         
         let statusClass = 'failed';
@@ -61,8 +61,8 @@ function displayTransactions(transactions) {
         
         const amount = new Intl.NumberFormat('en-US', { 
             style: 'currency', 
-            currency: transaction.currency 
-        }).format(transaction.amount);
+            currency: transaction.currency || 'EUR' 
+        }).format(transaction.amount || 0);
         
         const signatureStatus = transaction.signatureValid 
             ? '<span style="color: #28a745;">✓ Valid</span>' 
@@ -125,4 +125,7 @@ function exportToCSV() {
 document.addEventListener('DOMContentLoaded', function() {
     loadStats();
     loadTransactions();
+    
+    // Note: Buttons use onclick attributes in HTML, so no event listeners needed here
+    // The refreshData() and exportToCSV() functions are called directly from HTML
 });
