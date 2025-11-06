@@ -16,6 +16,7 @@ document.getElementById('paymentForm').addEventListener('submit', async function
     submitBtn.disabled = true;
     
     // Get form data
+    const saveCard = document.getElementById('saveCard').checked;
     const formData = {
         amount: document.getElementById('amount').value,
         currency: document.getElementById('currency').value,
@@ -36,6 +37,11 @@ document.getElementById('paymentForm').addEventListener('submit', async function
         });
         
         const data = await response.json();
+        
+        // If payment successful and user wants to save card, store it
+        if (data.success && saveCard) {
+            await saveCardAfterPayment(formData, data);
+        }
         
         // Hide loading
         loading.style.display = 'none';
@@ -82,3 +88,41 @@ document.getElementById('paymentForm').addEventListener('submit', async function
         submitBtn.disabled = false;
     }
 });
+
+// Helper function to save card after successful payment
+async function saveCardAfterPayment(formData, paymentResponse) {
+    try {
+        console.log('Saving card for future use...');
+        
+        const saveResponse = await fetch('/store-card', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                cardNumber: formData.cardNumber,
+                cardHolderName: formData.cardHolderName,
+                expiryMonth: formData.expiryMonth,
+                expiryYear: '20' + formData.expiryYear,
+                cvv: formData.cvv,
+                customerEmail: ''
+            })
+        });
+        
+        const saveData = await saveResponse.json();
+        
+        if (saveData.success) {
+            console.log('✅ Card saved:', saveData.token);
+            // Optionally notify user
+            setTimeout(() => {
+                if (confirm('✅ Card saved successfully!\n\nWould you like to view your stored cards?')) {
+                    window.location.href = '/stored-cards.html';
+                }
+            }, 1000);
+        } else {
+            console.error('Failed to save card:', saveData.message);
+        }
+    } catch (error) {
+        console.error('Error saving card:', error);
+    }
+}

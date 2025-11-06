@@ -12,6 +12,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const TRANSACTIONS_FILE = path.join(__dirname, 'data', 'transactions.json');
 const HPP_TRANSACTIONS_FILE = path.join(__dirname, 'data', 'hpp-transactions.json');
+const STORED_CARDS_FILE = path.join(__dirname, 'data', 'stored-cards.json');
 
 // Middleware
 app.use(bodyParser.json());
@@ -109,6 +110,44 @@ function saveHppTransaction(transaction) {
   }
 }
 
+// Stored Cards helper functions
+function loadStoredCards() {
+  try {
+    const data = fs.readFileSync(STORED_CARDS_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error loading stored cards:', error);
+    return [];
+  }
+}
+
+function saveStoredCard(cardData) {
+  try {
+    const cards = loadStoredCards();
+    cards.unshift(cardData); // Add to beginning
+    
+    fs.writeFileSync(STORED_CARDS_FILE, JSON.stringify(cards, null, 2));
+    console.log('Stored card saved:', cardData.token);
+    return true;
+  } catch (error) {
+    console.error('Error saving stored card:', error);
+    return false;
+  }
+}
+
+function deleteStoredCard(token) {
+  try {
+    let cards = loadStoredCards();
+    cards = cards.filter(card => card.token !== token);
+    fs.writeFileSync(STORED_CARDS_FILE, JSON.stringify(cards, null, 2));
+    console.log('Stored card deleted:', token);
+    return true;
+  } catch (error) {
+    console.error('Error deleting stored card:', error);
+    return false;
+  }
+}
+
 // Helper function to generate timestamp
 function getTimestamp() {
   const now = new Date();
@@ -146,6 +185,12 @@ function generateSignature(timestamp, merchantId, orderId, amount, currency, car
 function buildAuthRequest(orderData) {
   const { orderId, amount, currency, cardNumber, cardHolderName, expiryMonth, expiryYear, cvv, timestamp } = orderData;
   
+  // Ensure expiryYear is only 2 digits (convert 2025 -> 25)
+  const yearTwoDigits = expiryYear.length > 2 ? expiryYear.slice(-2) : expiryYear;
+  
+  // Ensure expiryMonth is 2 digits with leading zero
+  const monthTwoDigits = expiryMonth.padStart(2, '0');
+  
   const signature = generateSignature(
     timestamp,
     config.merchantId,
@@ -163,7 +208,7 @@ function buildAuthRequest(orderData) {
   <amount currency="${currency}">${amount}</amount>
   <card>
     <number>${cardNumber}</number>
-    <expdate>${expiryMonth}${expiryYear}</expdate>
+    <expdate>${monthTwoDigits}${yearTwoDigits}</expdate>
     <chname>${cardHolderName}</chname>
     <type>VISA</type>
     <cvn>
@@ -213,6 +258,52 @@ function buildRefundRequest(refundData) {
   <refundhash>${signature}</refundhash>
   <sha1hash>${signature}</sha1hash>
 </request>`;
+}
+
+// Helper function to build stored card auth request
+function buildStoredCardAuthRequest(orderData) {
+  const { orderId, amount, currency, cardHolderName, pasRef, timestamp } = orderData;
+  
+  // For stored card transactions, signature is simpler (no card number)
+  const step1 = `${timestamp}.${config.merchantId}.${orderId}.${amount}.${currency}`;
+  const hash1 = generateSha1Hash(step1);
+  const signature = generateSha1Hash(`${hash1}.${config.sharedSecret}`);
+  
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<request type="receipt-in" timestamp="${timestamp}">
+  <merchantid>${config.merchantId}</merchantid>
+  <account>${config.account}</account>
+  <orderid>${orderId}</orderid>
+  <amount currency="${currency}">${amount}</amount>
+  <payerref>${pasRef}</payerref>
+  <paymentmethod>${pasRef}</paymentmethod>
+  <autosettle flag="1"/>
+  <sha1hash>${signature}</sha1hash>
+</request>`;
+}
+
+// Helper function to detect card brand from card number
+function getCardBrand(cardNumber) {
+  const firstDigit = cardNumber.charAt(0);
+  const firstTwoDigits = cardNumber.substring(0, 2);
+  const firstFourDigits = cardNumber.substring(0, 4);
+  
+  if (firstDigit === '4') {
+    return 'Visa';
+  } else if (parseInt(firstTwoDigits) >= 51 && parseInt(firstTwoDigits) <= 55) {
+    return 'Mastercard';
+  } else if (firstTwoDigits === '34' || firstTwoDigits === '37') {
+    return 'American Express';
+  } else if (firstFourDigits === '6011' || firstTwoDigits === '65') {
+    return 'Discover';
+  } else if (parseInt(firstFourDigits) >= 3528 && parseInt(firstFourDigits) <= 3589) {
+    return 'JCB';
+  } else if (firstFourDigits === '3000' || firstFourDigits === '3095' || 
+             parseInt(firstTwoDigits) >= 36 && parseInt(firstTwoDigits) <= 39) {
+    return 'Diners Club';
+  } else {
+    return 'Unknown';
+  }
 }
 
 // Helper function to parse XML response
@@ -624,6 +715,239 @@ app.get('/hpp-transactions/stats', (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to load HPP stats: ' + error.message
+    });
+  }
+});
+
+// ========================================
+// Stored Cards / Card Tokenization
+// ========================================
+
+// Route: Get all stored cards
+app.get('/stored-cards', (req, res) => {
+  try {
+    const cards = loadStoredCards();
+    res.json({
+      success: true,
+      cards: cards
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load stored cards: ' + error.message
+    });
+  }
+});
+
+// Route: Store a new card (tokenization)
+app.post('/store-card', async (req, res) => {
+  const { cardNumber, cardHolderName, expiryMonth, expiryYear, cvv, customerEmail } = req.body;
+  
+  console.log('\n=== Storing Card ===');
+  console.log('Card Holder:', cardHolderName);
+  console.log('Customer Email:', customerEmail);
+  
+  try {
+    // Generate card reference (token)
+    const token = `CARD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const timestamp = getTimestamp();
+    const orderId = `STORE-${Date.now()}`;
+    
+    // For card storage, we typically do a $0 auth to verify card
+    const amountInCents = '0';
+    
+    // Build XML request for card storage (0 amount auth)
+    const xmlRequest = buildAuthRequest({
+      orderId,
+      amount: amountInCents,
+      currency: 'EUR',
+      cardNumber,
+      cardHolderName,
+      expiryMonth,
+      expiryYear,
+      cvv,
+      timestamp
+    });
+    
+    console.log('\n=== Sending Card Storage Request ===');
+    
+    // Send request to Global Payments API
+    const response = await axios.post(config.apiUrl, xmlRequest, {
+      headers: {
+        'Content-Type': 'application/xml'
+      }
+    });
+    
+    // Parse response
+    const parsedResponse = parseXmlResponse(response.data);
+    const isSuccess = parsedResponse.resultCode === '00';
+    
+    if (isSuccess) {
+      // Mask card number
+      const maskedCardNumber = cardNumber.slice(0, 6) + '****' + cardNumber.slice(-4);
+      const cardBrand = getCardBrand(cardNumber);
+      
+      // Store card details
+      const cardData = {
+        token: token,
+        maskedCardNumber: maskedCardNumber,
+        cardBrand: cardBrand,
+        cardHolderName: cardHolderName,
+        expiryMonth: expiryMonth,
+        expiryYear: expiryYear,
+        customerEmail: customerEmail || 'N/A',
+        createdAt: new Date().toISOString(),
+        lastUsed: null,
+        // Store payment reference for future charges
+        pasRef: parsedResponse.pasRef,
+        authCode: parsedResponse.authCode
+      };
+      
+      saveStoredCard(cardData);
+      
+      console.log('✅ Card stored successfully:', token);
+      
+      res.json({
+        success: true,
+        message: 'Card stored successfully',
+        token: token,
+        maskedCardNumber: maskedCardNumber,
+        cardBrand: cardBrand
+      });
+    } else {
+      res.json({
+        success: false,
+        message: 'Failed to verify card: ' + parsedResponse.message,
+        resultCode: parsedResponse.resultCode
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error storing card:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to store card: ' + error.message
+    });
+  }
+});
+
+// Route: Charge a stored card
+app.post('/charge-stored-card', async (req, res) => {
+  const { token, amount, currency } = req.body;
+  
+  console.log('\n=== Charging Stored Card ===');
+  console.log('Token:', token);
+  console.log('Amount:', amount);
+  
+  try {
+    // Find the stored card
+    const cards = loadStoredCards();
+    const card = cards.find(c => c.token === token);
+    
+    if (!card) {
+      return res.status(404).json({
+        success: false,
+        message: 'Card not found'
+      });
+    }
+    
+    // Generate order data
+    const orderId = `API-${Date.now()}`;
+    const timestamp = getTimestamp();
+    const amountInCents = Math.round(parseFloat(amount) * 100).toString();
+    
+    // Build XML request using stored card (without CVV for subsequent transactions)
+    const xmlRequest = buildStoredCardAuthRequest({
+      orderId,
+      amount: amountInCents,
+      currency,
+      cardHolderName: card.cardHolderName,
+      pasRef: card.pasRef,
+      timestamp
+    });
+    
+    console.log('\n=== XML Request for Stored Card ===');
+    console.log(xmlRequest);
+    
+    // Send request to Global Payments API
+    const response = await axios.post(config.apiUrl, xmlRequest, {
+      headers: {
+        'Content-Type': 'application/xml'
+      }
+    });
+    
+    // Parse response
+    const parsedResponse = parseXmlResponse(response.data);
+    const isSuccess = parsedResponse.resultCode === '00';
+    
+    // Update last used timestamp
+    card.lastUsed = new Date().toISOString();
+    const updatedCards = cards.map(c => c.token === token ? card : c);
+    fs.writeFileSync(STORED_CARDS_FILE, JSON.stringify(updatedCards, null, 2));
+    
+    // Log transaction
+    const transaction = {
+      orderId: parsedResponse.orderId || orderId,
+      timestamp: new Date().toISOString(),
+      amount: parseFloat(amount),
+      currency: currency,
+      cardHolderName: card.cardHolderName,
+      maskedCardNumber: card.maskedCardNumber,
+      resultCode: parsedResponse.resultCode,
+      message: parsedResponse.message,
+      success: isSuccess,
+      authCode: parsedResponse.authCode,
+      pasRef: parsedResponse.pasRef,
+      account: config.account,
+      paymentMethod: 'stored_card',
+      cardToken: token,
+      rawResponse: response.data
+    };
+    
+    saveTransaction(transaction);
+    
+    console.log(isSuccess ? '✅ Payment successful' : '❌ Payment failed');
+    
+    res.json({
+      success: isSuccess,
+      resultCode: parsedResponse.resultCode,
+      message: parsedResponse.message,
+      orderId: parsedResponse.orderId,
+      authCode: parsedResponse.authCode,
+      pasRef: parsedResponse.pasRef
+    });
+    
+  } catch (error) {
+    console.error('Error charging stored card:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to charge stored card: ' + error.message
+    });
+  }
+});
+
+// Route: Delete a stored card
+app.delete('/stored-cards/:token', (req, res) => {
+  const { token } = req.params;
+  
+  try {
+    const success = deleteStoredCard(token);
+    
+    if (success) {
+      res.json({
+        success: true,
+        message: 'Card deleted successfully'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to delete card'
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete card: ' + error.message
     });
   }
 });
