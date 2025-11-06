@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HPP Diagnostics - Global Payments</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <style>
+        .diagnostic-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        .issue-box {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .issue-box h2 {
+            color: #856404;
+            margin-top: 0;
+        }
+        .solution-box {
+            background: #d1ecf1;
+            border: 2px solid #17a2b8;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .solution-box h3 {
+            color: #0c5460;
+            margin-top: 0;
+        }
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            overflow-x: auto;
+        }
+        .step {
+            background: white;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .step h4 {
+            margin-top: 0;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="diagnostic-container">
+        <h1>🔍 HPP Integration Diagnostics</h1>
+        
+        <div class="issue-box">
+            <h2>⚠️ Why HPP Transactions Aren't Being Saved Locally</h2>
+            <p><strong>Root Cause:</strong> Your <code>HPP_RESPONSE_URL</code> is set to <code>http://localhost:3001/hpp-response</code></p>
+            
+            <p><strong>The Problem:</strong></p>
+            <ul>
+                <li>When a payment completes on Global Payments' server, they try to POST the result back to your response URL</li>
+                <li>Global Payments' servers are on the internet and <strong>cannot reach localhost</strong></li>
+                <li>The POST fails silently, so your server never receives the transaction data</li>
+                <li>Therefore, no transaction is saved locally</li>
+            </ul>
+            
+            <p><strong>Important:</strong> The payment DOES complete successfully on Global Payments' side. The transaction is processed and appears in your Global Payments merchant dashboard. You just won't see it in this local application.</p>
+            
+            <h3>All HPP Methods Are Affected When Using Localhost:</h3>
+            <ul>
+                <li>✗ <strong>Lightbox</strong> - Won't save transactions locally</li>
+                <li>✗ <strong>iFrame</strong> - Won't save transactions locally</li>
+                <li>✗ <strong>Redirect</strong> - Won't save transactions locally</li>
+            </ul>
+            
+            <p style="color: #28a745; margin-top: 15px;"><strong>✓ All methods WILL process payments successfully - you just need to check your Global Payments merchant portal to see the transactions.</strong></p>
+        </div>
+
+        <div class="solution-box">
+            <h3>✅ Solution 1: Check Global Payments Dashboard</h3>
+            <p>For localhost development:</p>
+            <ul>
+                <li>HPP payments ARE being processed successfully</li>
+                <li>View transactions in your <strong>Global Payments Merchant Portal</strong></li>
+                <li>This is normal for local development - transaction callbacks can't reach localhost</li>
+                <li>Use API mode (from home page) if you need local transaction tracking</li>
+            </ul>
+            <a href="/" class="btn-primary" style="display: inline-block; margin: 10px 0;">Use API Mode Instead →</a>
+        </div>
+
+        <div class="solution-box">
+            <h3>✅ Solution 2: Use ngrok for Local Testing</h3>
+            <p>To test Lightbox and iFrame locally, expose your server to the internet:</p>
+            
+            <div class="step">
+                <h4>Step 1: Install ngrok</h4>
+                <div class="code-block">brew install ngrok</div>
+                <p>Or download from <a href="https://ngrok.com/" target="_blank">ngrok.com</a></p>
+            </div>
+
+            <div class="step">
+                <h4>Step 2: Start ngrok</h4>
+                <div class="code-block">ngrok http 3001</div>
+                <p>You'll get a public URL like: <code>https://abc123.ngrok.io</code></p>
+            </div>
+
+            <div class="step">
+                <h4>Step 3: Update .env file</h4>
+                <div class="code-block">HPP_RESPONSE_URL=https://abc123.ngrok.io/hpp-response</div>
+                <p>Replace <code>abc123.ngrok.io</code> with your actual ngrok URL</p>
+            </div>
+
+            <div class="step">
+                <h4>Step 4: Restart your server</h4>
+                <p>Stop and restart the Node.js server to pick up the new environment variable</p>
+            </div>
+
+            <div class="step">
+                <h4>Step 5: Test!</h4>
+                <p>Now Lightbox and iFrame will work because Global Payments can reach your ngrok URL</p>
+            </div>
+        </div>
+
+        <div class="solution-box">
+            <h3>✅ Solution 3: Deploy to Production</h3>
+            <p>For production use, deploy your application to a server with a public domain:</p>
+            <ul>
+                <li>Deploy to: Heroku, AWS, Google Cloud, Azure, etc.</li>
+                <li>Get a public domain: <code>https://yourdomain.com</code></li>
+                <li>Set: <code>HPP_RESPONSE_URL=https://yourdomain.com/hpp-response</code></li>
+            </ul>
+        </div>
+
+        <h2>🧪 Test Current Configuration</h2>
+        <div class="code-block" id="currentConfig">
+            <strong>Current HPP_RESPONSE_URL:</strong> <span id="responseUrl">Loading...</span><br>
+            <strong>Is Public?</strong> <span id="isPublic">Checking...</span>
+        </div>
+
+        <div class="nav-buttons" style="margin-top: 30px;">
+            <a href="/hpp-options.html" class="btn-secondary">← Back to HPP Options</a>
+            <a href="/" class="btn-primary">Use API Mode (Saves Locally) →</a>
+        </div>
+    </div>
+
+    <script>
+        // Check current configuration
+        fetch('/generate-hpp-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: 1, currency: 'EUR' })
+        })
+        .then(res => res.json())
+        .then(data => {
+            const responseUrl = data.hppData.MERCHANT_RESPONSE_URL;
+            document.getElementById('responseUrl').textContent = responseUrl;
+            
+            const isLocalhost = responseUrl.includes('localhost') || responseUrl.includes('127.0.0.1');
+            const isPublicSpan = document.getElementById('isPublic');
+            
+            if (isLocalhost) {
+                isPublicSpan.innerHTML = '<span style="color: #dc3545;">❌ No - Using localhost (Lightbox/iFrame won\'t save transactions)</span>';
+            } else {
+                isPublicSpan.innerHTML = '<span style="color: #28a745;">✓ Yes - Public URL (All methods should work)</span>';
+            }
+        })
+        .catch(err => {
+            document.getElementById('responseUrl').textContent = 'Error loading config';
+            document.getElementById('isPublic').textContent = 'Error';
+        });
+    </script>
+</body>
+</html>

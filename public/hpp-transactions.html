@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HPP Transaction History - Global Payments</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/transactions.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 HPP Transaction History</h1>
+            <div>
+                <a href="/hpp-options.html">← Back to HPP Options</a>
+                <a href="/transactions.html" style="margin-left: 15px;">📊 API Transactions</a>
+            </div>
+        </div>
+
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <h3>Total Transactions</h3>
+                <div class="value" id="totalTransactions">-</div>
+            </div>
+            <div class="stat-card success">
+                <h3>Successful</h3>
+                <div class="value" id="successfulTransactions">-</div>
+            </div>
+            <div class="stat-card failed">
+                <h3>Failed</h3>
+                <div class="value" id="failedTransactions">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Amount</h3>
+                <div class="value" id="totalAmount">-</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button onclick="refreshData()">🔄 Refresh</button>
+            <button onclick="exportToCSV()">📥 Export CSV</button>
+        </div>
+
+        <div class="table-container">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Loading HPP transactions...</p>
+            </div>
+
+            <div class="empty-state" id="emptyState" style="display: none;">
+                <h3>No HPP Transactions Yet</h3>
+                <p>Complete a payment using HPP to see it appear here.</p>
+                <a href="/hpp-options.html" style="margin-top: 20px; display: inline-block;">Go to HPP Options</a>
+            </div>
+
+            <table id="transactionsTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Date/Time</th>
+                        <th>Order ID</th>
+                        <th>Status</th>
+                        <th>Amount</th>
+                        <th>Auth Code</th>
+                        <th>Payment Ref</th>
+                        <th>Message</th>
+                        <th>Signature</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionsBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="/js/hpp-transactions.js"></script>
+</body>
+</html>

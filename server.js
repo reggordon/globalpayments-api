@@ -11,6 +11,7 @@ const logger = require('./logger');
 const app = express();
 const PORT = process.env.PORT || 3001;
 const TRANSACTIONS_FILE = path.join(__dirname, 'data', 'transactions.json');
+const HPP_TRANSACTIONS_FILE = path.join(__dirname, 'data', 'hpp-transactions.json');
 
 // Middleware
 app.use(bodyParser.json());
@@ -77,6 +78,34 @@ function saveTransaction(transaction) {
     console.log('Transaction saved:', transaction.orderId);
   } catch (error) {
     console.error('Error saving transaction:', error);
+  }
+}
+
+// HPP-specific transaction functions
+function loadHppTransactions() {
+  try {
+    const data = fs.readFileSync(HPP_TRANSACTIONS_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error loading HPP transactions:', error);
+    return [];
+  }
+}
+
+function saveHppTransaction(transaction) {
+  try {
+    const transactions = loadHppTransactions();
+    transactions.unshift(transaction); // Add to beginning
+    
+    // Keep only last 1000 transactions
+    if (transactions.length > 1000) {
+      transactions.splice(1000);
+    }
+    
+    fs.writeFileSync(HPP_TRANSACTIONS_FILE, JSON.stringify(transactions, null, 2));
+    console.log('HPP Transaction saved:', transaction.orderId);
+  } catch (error) {
+    console.error('Error saving HPP transaction:', error);
   }
 }
 
@@ -548,6 +577,56 @@ app.get('/transactions/stats', (req, res) => {
   }
 });
 
+// Route: Get HPP transactions
+app.get('/hpp-transactions', (req, res) => {
+  try {
+    const transactions = loadHppTransactions();
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+    
+    const paginatedTransactions = transactions.slice(offset, offset + limit);
+    
+    res.json({
+      success: true,
+      total: transactions.length,
+      limit: limit,
+      offset: offset,
+      transactions: paginatedTransactions
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load HPP transactions: ' + error.message
+    });
+  }
+});
+
+// Route: Get HPP transaction stats
+app.get('/hpp-transactions/stats', (req, res) => {
+  try {
+    const transactions = loadHppTransactions();
+    
+    const stats = {
+      total: transactions.length,
+      successful: transactions.filter(t => t.success).length,
+      failed: transactions.filter(t => !t.success).length,
+      totalAmount: transactions.filter(t => t.success).reduce((sum, t) => sum + t.amount, 0),
+      currencies: [...new Set(transactions.map(t => t.currency))],
+      lastTransaction: transactions[0] || null
+    };
+    
+    res.json({
+      success: true,
+      stats: stats
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to load HPP stats: ' + error.message
+    });
+  }
+});
+
 // ========================================
 // HPP (Hosted Payment Page) Integration
 // ========================================
@@ -654,9 +733,15 @@ app.post('/generate-hpp-token', (req, res) => {
 
 // Route: Handle HPP response (POST)
 app.post('/hpp-response', (req, res) => {
+  console.log('\n\n========================================');
+  console.log('🚨 HPP RESPONSE ENDPOINT HIT!');
+  console.log('========================================');
   logger.info('HPP POST response received', { body: req.body });
   console.log('\n=== HPP Response Received ===');
   console.log('Response Data:', req.body);
+  console.log('Request Headers:', req.headers);
+  console.log('Request IP:', req.ip);
+  console.log('========================================\n');
   
   const {
     TIMESTAMP,
@@ -704,7 +789,9 @@ app.post('/hpp-response', (req, res) => {
     signatureValid: isValid
   };
   
-  saveTransaction(transaction);
+  console.log('Saving HPP transaction:', JSON.stringify(transaction, null, 2));
+  saveHppTransaction(transaction); // Save to HPP-specific file
+  console.log('HPP Transaction saved to hpp-transactions.json');
   logger.info('HPP transaction saved', { orderId: ORDER_ID, success: transaction.success });
   
   // Log HPP response
