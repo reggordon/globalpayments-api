@@ -1,8 +1,10 @@
 node_modules/
 config.json
 .env
+.env.yaml
 .DS_Store
 npm-debug.log*
 data/transactions.json
+data/hpp-transactions.json
 logs/
 *.log
