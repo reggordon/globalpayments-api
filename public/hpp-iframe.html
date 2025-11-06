@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HPP iFrame - Global Payments</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/hpp.css">
+    <style>
+        #hpp-iframe-container {
+            margin: 30px 0;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+            min-height: 500px;
+            display: none;
+        }
+
+        #hpp-iframe {
+            width: 100%;
+            height: 600px;
+            border: none;
+        }
+
+        .iframe-active #paymentForm {
+            display: none;
+        }
+
+        .iframe-active #hpp-iframe-container {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖼️ HPP Embedded iFrame Mode</h1>
+        <p class="subtitle">Payment Form Embedded in Page</p>
+
+        <div class="nav-links">
+            <a href="/hpp-options.html">← Back to HPP Options</a>
+            <a href="/transactions.html">📊 Transaction History</a>
+        </div>
+
+        <div class="info-box">
+            <strong>iFrame Mode:</strong> The payment form is embedded directly in this page using an iframe. 
+            Seamless experience without popups or redirects.
+        </div>
+
+        <form id="paymentForm">
+            <div class="form-group">
+                <label for="amount">Amount <span class="required">*</span></label>
+                <input type="number" id="amount" name="amount" placeholder="10.00" step="0.01" min="0.01" value="10.00" required>
+            </div>
+
+            <div class="form-group">
+                <label for="currency">Currency <span class="required">*</span></label>
+                <select id="currency" name="currency" required>
+                    <option value="EUR">EUR - Euro</option>
+                    <option value="USD">USD - US Dollar</option>
+                    <option value="GBP">GBP - British Pound</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="customerEmail">Customer Email (Optional)</label>
+                <input type="email" id="customerEmail" name="customerEmail" placeholder="customer@example.com">
+            </div>
+
+            <button type="submit" id="submitBtn">Load Payment Form</button>
+        </form>
+
+        <!-- iFrame container -->
+        <div id="hpp-iframe-container">
+            <iframe id="hpp-iframe" name="hpp-iframe"></iframe>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Loading payment form...</p>
+        </div>
+
+        <div class="result" id="result">
+            <h3 id="resultTitle"></h3>
+            <div class="result-details" id="resultDetails"></div>
+            <button onclick="location.reload()" style="margin-top: 15px;">Make Another Payment</button>
+        </div>
+
+        <div class="test-cards">
+            <h3>📝 Test Cards for Sandbox</h3>
+            <ul>
+                <li><strong>Success:</strong> 4263970000005262</li>
+                <li><strong>Declined:</strong> 4000120000001154</li>
+                <li><strong>CVV:</strong> 123 | <strong>Expiry:</strong> 03/28</li>
+            </ul>
+        </div>
+
+        <div class="info-box" style="margin-top: 30px; background: #e3f2fd; border-color: #2196F3;">
+            <strong>ℹ️ How it works:</strong>
+            <ol style="margin: 10px 0 0 20px; line-height: 1.8;">
+                <li>Click "Load Payment Form" button</li>
+                <li>HPP loads in an iframe below</li>
+                <li>Enter test card details in the embedded form</li>
+                <li>Submit payment</li>
+                <li>Results display on this page</li>
+            </ol>
+        </div>
+    </div>
+
+    <script src="/js/hpp-iframe.js"></script>
+</body>
+</html>

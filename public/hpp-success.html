@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful - Global Payments</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/hpp.css">
+    <style>
+        .success-container {
+            text-align: center;
+            padding: 40px 20px;
+            max-width: 600px;
+            margin: 50px auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .success-icon {
+            font-size: 80px;
+            color: #28a745;
+            margin-bottom: 20px;
+        }
+        .success-title {
+            font-size: 28px;
+            color: #28a745;
+            margin-bottom: 20px;
+        }
+        .warning-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 30px 0;
+            text-align: left;
+        }
+        .warning-box h3 {
+            color: #856404;
+            margin-top: 0;
+            font-size: 18px;
+        }
+        .warning-box p {
+            color: #856404;
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        .action-buttons {
+            margin-top: 30px;
+        }
+        .action-buttons a {
+            display: inline-block;
+            margin: 10px;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 500;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+    </style>
+</head>
+<body>
+    <div class="success-container">
+        <div class="success-icon">✓</div>
+        <h1 class="success-title">Payment Successful!</h1>
+        
+        <div class="warning-box">
+            <h3>⚠️ Connection Issue</h3>
+            <p>
+                Your transaction has been completed successfully, but there was a problem 
+                connecting back to the merchant's website.
+            </p>
+            <p>
+                <strong>Please contact the merchant and advise them that you received this error message.</strong>
+            </p>
+            <p>
+                Your payment has been processed and the merchant will receive confirmation.
+            </p>
+        </div>
+
+        <div class="action-buttons">
+            <a href="/transactions.html" class="btn-primary">View Transaction History</a>
+            <a href="/" class="btn-secondary">Return to Home</a>
+        </div>
+    </div>
+</body>
+</html>
