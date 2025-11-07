@@ -5,65 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Global Payments API</title>
     <link rel="stylesheet" href="/css/main.css">
-    <style>
-        .auth-container {
-            max-width: 500px;
-            margin: 50px auto;
-            padding: 30px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .auth-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .auth-header h1 {
-            color: #2c3e50;
-            margin-bottom: 10px;
-        }
-        .auth-header p {
-            color: #7f8c8d;
-        }
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            display: none;
-        }
-        .success-message {
-            background: #efe;
-            color: #3c3;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            display: none;
-        }
-        .auth-footer {
-            text-align: center;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #eee;
-        }
-        .auth-footer a {
-            color: #3498db;
-            text-decoration: none;
-        }
-        .auth-footer a:hover {
-            text-decoration: underline;
-        }
-        .remember-me {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-top: 10px;
-        }
-        .remember-me input[type="checkbox"] {
-            width: auto;
-        }
-    </style>
 </head>
 <body>
     <div class="auth-container">
@@ -88,10 +29,10 @@
 
             <div class="remember-me">
                 <input type="checkbox" id="rememberMe" name="rememberMe">
-                <label for="rememberMe" style="margin: 0;">Remember me</label>
+                <label for="rememberMe">Remember me</label>
             </div>
 
-            <button type="submit" class="btn-primary" id="loginBtn" style="margin-top: 20px;">
+            <button type="submit" class="btn-primary btn-login" id="loginBtn">
                 Sign In
             </button>
         </form>

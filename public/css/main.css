@@ -346,3 +346,275 @@ button:disabled {
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);
 }
 
+/* ========================================
+   Authentication Pages (Register/Login)
+   ======================================== */
+
+.auth-container {
+    max-width: 500px;
+    margin: 50px auto;
+    padding: 30px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.auth-header h1 {
+    color: #2c3e50;
+    margin-bottom: 10px;
+    text-align: left;
+    font-size: 24px;
+}
+
+.auth-header p {
+    color: #7f8c8d;
+    text-align: left;
+}
+
+.error-message {
+    background: #fee;
+    color: #c33;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    display: none;
+}
+
+.success-message {
+    background: #efe;
+    color: #3c3;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    display: none;
+}
+
+.auth-footer {
+    text-align: center;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+.auth-footer a {
+    color: #3498db;
+    text-decoration: none;
+}
+
+.auth-footer a:hover {
+    text-decoration: underline;
+}
+
+.password-requirements {
+    font-size: 12px;
+    color: #7f8c8d;
+    margin-top: 5px;
+}
+
+.remember-me {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.remember-me input[type="checkbox"] {
+    width: auto;
+}
+
+.remember-me label {
+    margin: 0 !important;
+    text-transform: capitalize;
+    letter-spacing: 0;
+    font-weight: normal;
+}
+
+.btn-login {
+    margin-top: 20px;
+}
+
+/* ========================================
+   Profile Page
+   ======================================== */
+
+.profile-container {
+    max-width: 1000px;
+    margin: 30px auto;
+    padding: 20px;
+}
+
+.profile-header {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+}
+
+.profile-header h1 {
+    margin: 0 0 10px 0;
+    color: #2c3e50;
+    font-size: 24px;
+    text-align: left;
+}
+
+.profile-header .user-email {
+    color: #7f8c8d;
+    font-size: 14px;
+}
+
+.profile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.profile-card {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.profile-card h2 {
+    margin: 0 0 20px 0;
+    color: #2c3e50;
+    font-size: 18px;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+.profile-card p {
+    color: #7f8c8d;
+    margin-bottom: 15px;
+}
+
+.logout-btn {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 20px;
+}
+
+.logout-btn:hover {
+    background: #c0392b;
+}
+
+.placeholder-text {
+    color: #95a5a6;
+    font-style: italic;
+}
+
+.quick-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.quick-actions a {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #3498db;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.quick-actions a:hover {
+    background: #2980b9;
+}
+
+/* Transactions */
+
+.transaction-item {
+    padding: 15px;
+    border-bottom: 1px solid #ecf0f1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.transaction-item:last-child {
+    border-bottom: none;
+}
+
+.transaction-details {
+    flex: 1;
+}
+
+.transaction-amount {
+    font-weight: bold;
+    font-size: 16px;
+    margin-right: 10px;
+}
+
+.transaction-status {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.status-success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.transaction-date {
+    font-size: 12px;
+    color: #95a5a6;
+}
+
+.transaction-card {
+    font-size: 13px;
+    color: #7f8c8d;
+}
+
+.no-transactions {
+    text-align: center;
+    padding: 30px;
+    color: #95a5a6;
+}
+
+.no-transactions p {
+    color: #95a5a6;
+}
+
+.no-transactions-link {
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+.no-transactions-link a {
+    color: #3498db;
+    text-decoration: none;
+}
+
+.no-transactions-link a:hover {
+    text-decoration: underline;
+}
+
+.transaction-right {
+    text-align: right;
+}
+
+.transaction-message {
+    margin-top: 3px;
+}
+

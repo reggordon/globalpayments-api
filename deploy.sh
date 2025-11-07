@@ -89,17 +89,14 @@ echo ""
 
 # Get service URL
 SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --platform managed --region $REGION --format 'value(status.url)')
+CUSTOM_DOMAIN="https://payments.reggordon.com"
 
 echo "🌐 Your application is live at:"
-echo "   $SERVICE_URL"
+echo "   Cloud Run: $SERVICE_URL"
+echo "   Custom Domain: $CUSTOM_DOMAIN"
 echo ""
-echo "⚠️  IMPORTANT: Update HPP_RESPONSE_URL"
-echo ""
-echo "1. Edit .env.yaml and update HPP_RESPONSE_URL to:"
-echo "   HPP_RESPONSE_URL: \"${SERVICE_URL}/hpp-response\""
-echo ""
-echo "2. Redeploy to activate HPP callbacks:"
-echo "   ./deploy.sh $PROJECT_ID"
+echo "✅ HPP_RESPONSE_URL is already configured in .env.yaml"
+echo "   Current value: https://payments.reggordon.com/hpp-response"
 echo ""
 echo "📊 View logs:"
 echo "   gcloud run logs tail $SERVICE_NAME --region $REGION"
