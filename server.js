@@ -7,17 +7,34 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
+const bcrypt = require('bcrypt');
+const session = require('express-session');
+const jwt = require('jsonwebtoken');
+const { body, validationResult } = require('express-validator');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const TRANSACTIONS_FILE = path.join(__dirname, 'data', 'transactions.json');
 const HPP_TRANSACTIONS_FILE = path.join(__dirname, 'data', 'hpp-transactions.json');
 const STORED_CARDS_FILE = path.join(__dirname, 'data', 'stored-cards.json');
+const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 
 // Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
 
 // Load configuration from environment variables
 const config = {
@@ -148,6 +165,49 @@ function deleteStoredCard(token) {
   } catch (error) {
     console.error('Error deleting stored card:', error);
     return false;
+  }
+}
+
+// User management helper functions
+function loadUsers() {
+  try {
+    const data = fs.readFileSync(USERS_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error loading users:', error);
+    return [];
+  }
+}
+
+function saveUser(user) {
+  try {
+    const users = loadUsers();
+    users.push(user);
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+    console.log('User saved:', user.email);
+    return true;
+  } catch (error) {
+    console.error('Error saving user:', error);
+    return false;
+  }
+}
+
+function findUserByEmail(email) {
+  const users = loadUsers();
+  return users.find(user => user.email.toLowerCase() === email.toLowerCase());
+}
+
+function findUserById(userId) {
+  const users = loadUsers();
+  return users.find(user => user.id === userId);
+}
+
+// Authentication middleware
+function requireAuth(req, res, next) {
+  if (req.session && req.session.userId) {
+    next();
+  } else {
+    res.status(401).json({ success: false, message: 'Authentication required' });
   }
 }
 
@@ -339,6 +399,137 @@ function parseXmlResponse(xmlString) {
   
   return result;
 }
+
+// ==================== AUTHENTICATION ROUTES ====================
+
+// Register new user
+app.post('/api/register', [
+  body('email').isEmail().normalizeEmail(),
+  body('password').isLength({ min: 8 }),
+  body('name').trim().notEmpty()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+
+  const { email, password, name } = req.body;
+
+  // Check if user already exists
+  if (findUserByEmail(email)) {
+    return res.status(400).json({ success: false, message: 'Email already registered' });
+  }
+
+  try {
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create user
+    const user = {
+      id: uuidv4(),
+      email,
+      name,
+      passwordHash,
+      createdAt: new Date().toISOString()
+    };
+
+    // Save user
+    if (saveUser(user)) {
+      // Create session
+      req.session.userId = user.id;
+      req.session.userEmail = user.email;
+
+      res.json({
+        success: true,
+        message: 'Registration successful',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name
+        }
+      });
+    } else {
+      res.status(500).json({ success: false, message: 'Error saving user' });
+    }
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Login user
+app.post('/api/login', [
+  body('email').isEmail().normalizeEmail(),
+  body('password').notEmpty()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+
+  const { email, password } = req.body;
+
+  try {
+    // Find user
+    const user = findUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    // Verify password
+    const passwordMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!passwordMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    // Create session
+    req.session.userId = user.id;
+    req.session.userEmail = user.email;
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Logout user
+app.post('/api/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: 'Error logging out' });
+    }
+    res.clearCookie('connect.sid');
+    res.json({ success: true, message: 'Logout successful' });
+  });
+});
+
+// Get current user
+app.get('/api/user', requireAuth, (req, res) => {
+  const user = findUserById(req.session.userId);
+  if (user) {
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name
+      }
+    });
+  } else {
+    res.status(404).json({ success: false, message: 'User not found' });
+  }
+});
+
+// ==================== PAYMENT ROUTES ====================
 
 // Route: Home page
 app.get('/', (req, res) => {

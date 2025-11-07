@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Global Payments API</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <style>
+        .auth-container {
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .auth-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .auth-header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .auth-header p {
+            color: #7f8c8d;
+        }
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .auth-footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .auth-footer a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .auth-footer a:hover {
+            text-decoration: underline;
+        }
+        .password-requirements {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-header">
+            <h1>Create Account</h1>
+            <p>Register to save cards and view transaction history</p>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+
+        <form id="registerForm">
+            <div class="form-group">
+                <label for="name">Full Name <span class="required">*</span></label>
+                <input type="text" id="name" name="name" placeholder="John Doe" required>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address <span class="required">*</span></label>
+                <input type="email" id="email" name="email" placeholder="john@example.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password <span class="required">*</span></label>
+                <input type="password" id="password" name="password" placeholder="••••••••" required minlength="8">
+                <div class="password-requirements">Minimum 8 characters required</div>
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword">Confirm Password <span class="required">*</span></label>
+                <input type="password" id="confirmPassword" name="confirmPassword" placeholder="••••••••" required minlength="8">
+            </div>
+
+            <button type="submit" class="btn-primary" id="registerBtn">
+                Create Account
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Already have an account? <a href="/login.html">Sign in</a></p>
+            <p><a href="/">← Back to Home</a></p>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('registerForm');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const registerBtn = document.getElementById('registerBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Clear messages
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+
+            // Get form values
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            // Validate passwords match
+            if (password !== confirmPassword) {
+                errorMessage.textContent = 'Passwords do not match';
+                errorMessage.style.display = 'block';
+                return;
+            }
+
+            // Validate password length
+            if (password.length < 8) {
+                errorMessage.textContent = 'Password must be at least 8 characters';
+                errorMessage.style.display = 'block';
+                return;
+            }
+
+            // Disable button
+            registerBtn.disabled = true;
+            registerBtn.textContent = 'Creating Account...';
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ name, email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    successMessage.textContent = 'Account created successfully! Redirecting...';
+                    successMessage.style.display = 'block';
+                    form.reset();
+                    
+                    // Redirect to profile page after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = '/profile.html';
+                    }, 2000);
+                } else {
+                    errorMessage.textContent = data.message || 'Registration failed. Please try again.';
+                    errorMessage.style.display = 'block';
+                    registerBtn.disabled = false;
+                    registerBtn.textContent = 'Create Account';
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                errorMessage.textContent = 'Server error. Please try again later.';
+                errorMessage.style.display = 'block';
+                registerBtn.disabled = false;
+                registerBtn.textContent = 'Create Account';
+            }
+        });
+    </script>
+    <script src="/js/theme-switcher.js"></script>
+</body>
+</html>

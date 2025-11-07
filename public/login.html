@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Global Payments API</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <style>
+        .auth-container {
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .auth-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .auth-header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .auth-header p {
+            color: #7f8c8d;
+        }
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .auth-footer {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        .auth-footer a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .auth-footer a:hover {
+            text-decoration: underline;
+        }
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .remember-me input[type="checkbox"] {
+            width: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-header">
+            <h1>Sign In</h1>
+            <p>Access your account and saved payment methods</p>
+        </div>
+
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email Address <span class="required">*</span></label>
+                <input type="email" id="email" name="email" placeholder="john@example.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password <span class="required">*</span></label>
+                <input type="password" id="password" name="password" placeholder="••••••••" required>
+            </div>
+
+            <div class="remember-me">
+                <input type="checkbox" id="rememberMe" name="rememberMe">
+                <label for="rememberMe" style="margin: 0;">Remember me</label>
+            </div>
+
+            <button type="submit" class="btn-primary" id="loginBtn" style="margin-top: 20px;">
+                Sign In
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <p>Don't have an account? <a href="/register.html">Create one</a></p>
+            <p><a href="/">← Back to Home</a></p>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('loginForm');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const loginBtn = document.getElementById('loginBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Clear messages
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+
+            // Get form values
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+
+            // Disable button
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Signing In...';
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    successMessage.textContent = 'Login successful! Redirecting...';
+                    successMessage.style.display = 'block';
+                    
+                    // Redirect to profile page after 1 second
+                    setTimeout(() => {
+                        window.location.href = '/profile.html';
+                    }, 1000);
+                } else {
+                    errorMessage.textContent = data.message || 'Login failed. Please check your credentials.';
+                    errorMessage.style.display = 'block';
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = 'Sign In';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                errorMessage.textContent = 'Server error. Please try again later.';
+                errorMessage.style.display = 'block';
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Sign In';
+            }
+        });
+    </script>
+    <script src="/js/theme-switcher.js"></script>
+</body>
+</html>
