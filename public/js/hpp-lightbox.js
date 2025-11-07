@@ -28,7 +28,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({
                     amount: amount,
                     currency: currency,
-                    customerEmail: customerEmail || ''
+                    customerEmail: customerEmail || '',
+                    hppType: 'lightbox'
                 })
             });
 

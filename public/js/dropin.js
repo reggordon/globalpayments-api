@@ -50,7 +50,8 @@ document.getElementById('paymentForm').addEventListener('submit', async function
             body: JSON.stringify({
                 amount: amount,
                 currency: currency,
-                cardHolderName: cardHolderName
+                cardHolderName: cardHolderName,
+                hppType: 'dropin'
             })
         });
         

@@ -1069,9 +1069,9 @@ function verifyHppResponseSignature(timestamp, merchantId, orderId, result, mess
 
 // Route: Generate HPP token/parameters
 app.post('/generate-hpp-token', (req, res) => {
-  const { amount, currency, cardHolderName, customerEmail } = req.body;
+  const { amount, currency, cardHolderName, customerEmail, hppType } = req.body;
   
-  logger.info('HPP token generation requested', { amount, currency });
+  logger.info('HPP token generation requested', { amount, currency, hppType });
   
   // Validate input
   if (!amount || !currency) {
@@ -1110,7 +1110,27 @@ app.post('/generate-hpp-token', (req, res) => {
   console.log('Order ID:', orderId);
   console.log('Amount:', amountInCents);
   console.log('Currency:', currency);
+  console.log('HPP Type:', hppType || 'Not specified');
   console.log('Generated Hash:', signature);
+  
+  // Determine comment based on HPP type
+  let comment1 = 'HPP Payment';
+  switch(hppType) {
+    case 'lightbox':
+      comment1 = 'HPP Lightbox Payment';
+      break;
+    case 'redirect':
+      comment1 = 'HPP Redirect Payment';
+      break;
+    case 'iframe':
+      comment1 = 'HPP iFrame Payment';
+      break;
+    case 'dropin':
+      comment1 = 'Drop-In UI Payment';
+      break;
+    default:
+      comment1 = 'HPP Payment';
+  }
   
   // Prepare HPP parameters - match exact structure of working HPP app
   const hppData = {
@@ -1124,7 +1144,7 @@ app.post('/generate-hpp-token', (req, res) => {
     MERCHANT_RESPONSE_URL: config.hppResponseUrl,
     HPP_VERSION: '2',
     SHA1HASH: signature,
-    COMMENT1: 'Drop-In UI Payment',
+    COMMENT1: comment1,
     COMMENT2: ''
   };
   
