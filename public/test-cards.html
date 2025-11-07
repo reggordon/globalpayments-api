@@ -199,11 +199,12 @@
         <div class="info-section">
             <h2>General Information</h2>
             <ul>
-                <li>All test cards use <code>CVV: 123</code> (or <code>1234</code> for Amex)</li>
+                <li>All test cards use <code>CVV: 123</code> (or <code>1234</code> for Amex) unless otherwise noted</li>
                 <li>Use any future expiry date (e.g., <code>12/25</code>, <code>01/30</code>)</li>
                 <li>Use any name for cardholder name</li>
                 <li>Test cards only work in sandbox environment</li>
                 <li>3D Secure testing available with specific cards (see below)</li>
+                <li><strong>Note:</strong> Global Payments sandbox may approve most cards by default. Use specific CVV values or card numbers below to test declines and errors</li>
             </ul>
         </div>
 
@@ -313,32 +314,32 @@
                 
                 <div class="card-item">
                     <div class="card-brand">VISA - DECLINED</div>
-                    <div class="card-number">4000 0000 0000 0002 <button class="copy-btn" onclick="copyCard('4000000000000002')">Copy</button></div>
+                    <div class="card-number">4009 3488 8888 1881 <button class="copy-btn" onclick="copyCard('4009348888881881')">Copy</button></div>
                     <div class="card-details">
                         <span>CVV: 123</span>
                         <span>Expiry: Any future date</span>
                     </div>
-                    <span class="card-result declined">Declined - Generic</span>
+                    <span class="card-result declined">Declined - Do Not Honor</span>
                 </div>
 
                 <div class="card-item">
                     <div class="card-brand">VISA - INSUFFICIENT FUNDS</div>
-                    <div class="card-number">4000 0000 0000 9995 <button class="copy-btn" onclick="copyCard('4000000000009995')">Copy</button></div>
+                    <div class="card-number">4111 1111 1111 1111 <button class="copy-btn" onclick="copyCard('4111111111111111')">Copy</button></div>
                     <div class="card-details">
-                        <span>CVV: 123</span>
+                        <span>CVV: 999</span>
                         <span>Expiry: Any future date</span>
                     </div>
-                    <span class="card-result declined">Declined - Insufficient Funds</span>
+                    <span class="card-result declined">Use CVV 999 to trigger decline</span>
                 </div>
 
                 <div class="card-item">
                     <div class="card-brand">MASTERCARD - DECLINED</div>
-                    <div class="card-number">5100 0000 0000 0008 <button class="copy-btn" onclick="copyCard('5100000000000008')">Copy</button></div>
+                    <div class="card-number">5114 6100 0000 0087 <button class="copy-btn" onclick="copyCard('5114610000000087')">Copy</button></div>
                     <div class="card-details">
                         <span>CVV: 123</span>
                         <span>Expiry: Any future date</span>
                     </div>
-                    <span class="card-result declined">Declined - Generic</span>
+                    <span class="card-result declined">Declined - Card Declined</span>
                 </div>
             </div>
 
@@ -346,23 +347,33 @@
                 <h2>Card Errors</h2>
                 
                 <div class="card-item">
-                    <div class="card-brand">VISA - PROCESSING ERROR</div>
-                    <div class="card-number">4000 0000 0000 0101 <button class="copy-btn" onclick="copyCard('4000000000000101')">Copy</button></div>
+                    <div class="card-brand">VISA - INVALID CARD</div>
+                    <div class="card-number">4111 1111 1111 1234 <button class="copy-btn" onclick="copyCard('4111111111111234')">Copy</button></div>
                     <div class="card-details">
                         <span>CVV: 123</span>
                         <span>Expiry: Any future date</span>
                     </div>
-                    <span class="card-result error">Processing Error</span>
+                    <span class="card-result error">Invalid Card Number</span>
                 </div>
 
                 <div class="card-item">
                     <div class="card-brand">VISA - CVV FAILURE</div>
-                    <div class="card-number">4000 0000 0000 0127 <button class="copy-btn" onclick="copyCard('4000000000000127')">Copy</button></div>
+                    <div class="card-number">4263 9700 0000 0005 <button class="copy-btn" onclick="copyCard('4263970000000005')">Copy</button></div>
                     <div class="card-details">
-                        <span>CVV: Use wrong CVV</span>
+                        <span>CVV: 111</span>
                         <span>Expiry: Any future date</span>
                     </div>
-                    <span class="card-result error">CVV Check Failed</span>
+                    <span class="card-result error">Use CVV 111 to trigger CVV failure</span>
+                </div>
+
+                <div class="card-item">
+                    <div class="card-brand">VISA - EXPIRED CARD</div>
+                    <div class="card-number">4263 9700 0000 0005 <button class="copy-btn" onclick="copyCard('4263970000000005')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 123</span>
+                        <span>Expiry: Use past date (e.g., 12/20)</span>
+                    </div>
+                    <span class="card-result error">Expired Card Error</span>
                 </div>
             </div>
 
