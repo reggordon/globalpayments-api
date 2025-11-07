@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Cards - Global Payments Sandbox</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <style>
+        .test-cards-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .page-header {
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .page-header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+
+        .page-header p {
+            font-size: 14px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .card-category {
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 20px;
+        }
+
+        .card-category h2 {
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin: 0 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3b82f6;
+        }
+
+        .card-item {
+            background: #0f172a;
+            border: 1px solid #334155;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.2s;
+        }
+
+        .card-item:hover {
+            border-color: #3b82f6;
+            transform: translateX(5px);
+        }
+
+        .card-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .card-brand {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #3b82f6;
+            margin-bottom: 8px;
+        }
+
+        .card-number {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: 700;
+            color: #f1f5f9;
+            margin-bottom: 8px;
+            letter-spacing: 2px;
+        }
+
+        .card-details {
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+        }
+
+        .card-result {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 4px 8px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            display: inline-block;
+        }
+
+        .card-result.success {
+            border-color: #10b981;
+            color: #10b981;
+        }
+
+        .card-result.declined {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        .card-result.error {
+            border-color: #f59e0b;
+            color: #f59e0b;
+        }
+
+        .info-section {
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .info-section h2 {
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin: 0 0 15px 0;
+            color: #3b82f6;
+        }
+
+        .info-section ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .info-section li {
+            font-size: 14px;
+            color: #cbd5e1;
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .info-section code {
+            background: #0f172a;
+            border: 1px solid #334155;
+            padding: 2px 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #3b82f6;
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid #334155;
+            color: #94a3b8;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s;
+            margin-left: 10px;
+        }
+
+        .copy-btn:hover {
+            border-color: #3b82f6;
+            color: #3b82f6;
+        }
+
+        .copy-btn.copied {
+            border-color: #10b981;
+            color: #10b981;
+        }
+
+        .nav-buttons {
+            text-align: center;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-cards-container">
+        <div class="page-header">
+            <h1>Global Payments Test Cards</h1>
+            <p>Sandbox Environment Test Data</p>
+        </div>
+
+        <div class="info-section">
+            <h2>General Information</h2>
+            <ul>
+                <li>All test cards use <code>CVV: 123</code> (or <code>1234</code> for Amex)</li>
+                <li>Use any future expiry date (e.g., <code>12/25</code>, <code>01/30</code>)</li>
+                <li>Use any name for cardholder name</li>
+                <li>Test cards only work in sandbox environment</li>
+                <li>3D Secure testing available with specific cards (see below)</li>
+            </ul>
+        </div>
+
+        <div class="cards-grid">
+            <div class="card-category">
+                <h2>Visa - Successful Transactions</h2>
+                
+                <div class="card-item">
+                    <div class="card-brand">VISA</div>
+                    <div class="card-number">4263 9700 0000 0005 <button class="copy-btn" onclick="copyCard('4263970000000005')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 123</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result success">Approved</span>
+                </div>
+
+                <div class="card-item">
+                    <div class="card-brand">VISA</div>
+                    <div class="card-number">4242 4242 4242 4242 <button class="copy-btn" onclick="copyCard('4242424242424242')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 123</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result success">Approved</span>
+                </div>
+            </div>
+
+            <div class="card-category">
+                <h2>Mastercard - Successful Transactions</h2>
+                
+                <div class="card-item">
+                    <div class="card-brand">MASTERCARD</div>
+                    <div class="card-number">5425 2334 3010 9903 <button class="copy-btn" onclick="copyCard('5425233430109903')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 123</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result success">Approved</span>
+                </div>
+
+                <div class="card-item">
+                    <div class="card-brand">MASTERCARD</div>
+                    <div class="card-number">2223 0000 1018 1375 <button class="copy-btn" onclick="copyCard('2223000010181375')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 123</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result success">Approved</span>
+                </div>
+            </div>
+
+            <div class="card-category">
+                <h2>American Express - Successful Transactions</h2>
+                
+                <div class="card-item">
+                    <div class="card-brand">AMERICAN EXPRESS</div>
+                    <div class="card-number">3742 4540 0001 1126 <button class="copy-btn" onclick="copyCard('374245400011126')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 1234</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result success">Approved</span>
+                </div>
+
+                <div class="card-item">
+                    <div class="card-brand">AMERICAN EXPRESS</div>
+                    <div class="card-number">3782 822463 10005 <button class="copy-btn" onclick="copyCard('378282246310005')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 1234</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result success">Approved</span>
+                </div>
+            </div>
+
+            <div class="card-category">
+                <h2>Discover - Successful Transactions</h2>
+                
+                <div class="card-item">
+                    <div class="card-brand">DISCOVER</div>
+                    <div class="card-number">6011 1111 1111 1117 <button class="copy-btn" onclick="copyCard('6011111111111117')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 123</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result success">Approved</span>
+                </div>
+            </div>
+
+            <div class="card-category">
+                <h2>JCB - Successful Transactions</h2>
+                
+                <div class="card-item">
+                    <div class="card-brand">JCB</div>
+                    <div class="card-number">3530 1113 3330 0000 <button class="copy-btn" onclick="copyCard('3530111333300000')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 123</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result success">Approved</span>
+                </div>
+            </div>
+
+            <div class="card-category">
+                <h2>Declined Transactions</h2>
+                
+                <div class="card-item">
+                    <div class="card-brand">VISA - DECLINED</div>
+                    <div class="card-number">4000 0000 0000 0002 <button class="copy-btn" onclick="copyCard('4000000000000002')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 123</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result declined">Declined - Generic</span>
+                </div>
+
+                <div class="card-item">
+                    <div class="card-brand">VISA - INSUFFICIENT FUNDS</div>
+                    <div class="card-number">4000 0000 0000 9995 <button class="copy-btn" onclick="copyCard('4000000000009995')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 123</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result declined">Declined - Insufficient Funds</span>
+                </div>
+
+                <div class="card-item">
+                    <div class="card-brand">MASTERCARD - DECLINED</div>
+                    <div class="card-number">5100 0000 0000 0008 <button class="copy-btn" onclick="copyCard('5100000000000008')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 123</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result declined">Declined - Generic</span>
+                </div>
+            </div>
+
+            <div class="card-category">
+                <h2>Card Errors</h2>
+                
+                <div class="card-item">
+                    <div class="card-brand">VISA - PROCESSING ERROR</div>
+                    <div class="card-number">4000 0000 0000 0101 <button class="copy-btn" onclick="copyCard('4000000000000101')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 123</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result error">Processing Error</span>
+                </div>
+
+                <div class="card-item">
+                    <div class="card-brand">VISA - CVV FAILURE</div>
+                    <div class="card-number">4000 0000 0000 0127 <button class="copy-btn" onclick="copyCard('4000000000000127')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: Use wrong CVV</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result error">CVV Check Failed</span>
+                </div>
+            </div>
+
+            <div class="card-category">
+                <h2>3D Secure Test Cards</h2>
+                
+                <div class="card-item">
+                    <div class="card-brand">VISA - 3DS ENROLLED</div>
+                    <div class="card-number">4012 0010 3714 1112 <button class="copy-btn" onclick="copyCard('4012001037141112')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 123</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result success">3DS Challenge Flow</span>
+                </div>
+
+                <div class="card-item">
+                    <div class="card-brand">MASTERCARD - 3DS ENROLLED</div>
+                    <div class="card-number">5200 0000 0000 1005 <button class="copy-btn" onclick="copyCard('5200000000001005')">Copy</button></div>
+                    <div class="card-details">
+                        <span>CVV: 123</span>
+                        <span>Expiry: Any future date</span>
+                    </div>
+                    <span class="card-result success">3DS Challenge Flow</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <h2>3D Secure Testing</h2>
+            <ul>
+                <li>Use 3DS enrolled cards to test authentication challenges</li>
+                <li>In sandbox, you'll see a test authentication page</li>
+                <li>Any password will work in the test 3DS interface</li>
+                <li>3DS adds an extra security layer for card-not-present transactions</li>
+            </ul>
+        </div>
+
+        <div class="info-section">
+            <h2>Testing Tips</h2>
+            <ul>
+                <li><strong>Amounts:</strong> Use any amount - sandbox doesn't process real money</li>
+                <li><strong>Currencies:</strong> Test with EUR, USD, GBP, and other supported currencies</li>
+                <li><strong>Multiple Attempts:</strong> You can reuse the same card multiple times</li>
+                <li><strong>Transaction History:</strong> All test transactions are logged for review</li>
+                <li><strong>Result Codes:</strong> Pay attention to response codes for debugging</li>
+            </ul>
+        </div>
+
+        <div class="nav-buttons">
+            <a href="/" class="btn-primary">Home</a>
+            <a href="/api-payment.html" class="btn-secondary">Try API Payment</a>
+            <a href="/hpp-options.html" class="btn-secondary">Try HPP Payment</a>
+        </div>
+    </div>
+
+    <script>
+        function copyCard(cardNumber) {
+            // Remove spaces for copying
+            const cleanNumber = cardNumber.replace(/\s/g, '');
+            
+            // Create temporary input
+            const temp = document.createElement('input');
+            temp.value = cleanNumber;
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+
+            // Find the button that was clicked
+            const buttons = document.querySelectorAll('.copy-btn');
+            buttons.forEach(btn => {
+                if (btn.textContent === 'Copied!') {
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('copied');
+                }
+            });
+
+            // Update clicked button
+            event.target.textContent = 'Copied!';
+            event.target.classList.add('copied');
+
+            // Reset after 2 seconds
+            setTimeout(() => {
+                event.target.textContent = 'Copy';
+                event.target.classList.remove('copied');
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
