@@ -213,7 +213,7 @@ function buildAuthRequest(orderData) {
     <number>${cardNumber}</number>
     <expdate>${monthTwoDigits}${yearTwoDigits}</expdate>
     <chname>${cardHolderName}</chname>
-    <type>VISA</type>
+    <type>${getCardBrand(cardNumber)}</type>
     <cvn>
       <number>${cvv}</number>
       <presind>1</presind>
@@ -292,20 +292,20 @@ function getCardBrand(cardNumber) {
   const firstFourDigits = cardNumber.substring(0, 4);
   
   if (firstDigit === '4') {
-    return 'Visa';
+    return 'VISA';
   } else if (parseInt(firstTwoDigits) >= 51 && parseInt(firstTwoDigits) <= 55) {
-    return 'Mastercard';
+    return 'MC';
   } else if (firstTwoDigits === '34' || firstTwoDigits === '37') {
-    return 'American Express';
+    return 'AMEX';
   } else if (firstFourDigits === '6011' || firstTwoDigits === '65') {
-    return 'Discover';
+    return 'DINERS';
   } else if (parseInt(firstFourDigits) >= 3528 && parseInt(firstFourDigits) <= 3589) {
     return 'JCB';
   } else if (firstFourDigits === '3000' || firstFourDigits === '3095' || 
              parseInt(firstTwoDigits) >= 36 && parseInt(firstTwoDigits) <= 39) {
-    return 'Diners Club';
+    return 'DINERS';
   } else {
-    return 'Unknown';
+    return 'VISA';
   }
 }
 
