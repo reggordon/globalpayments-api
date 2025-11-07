@@ -346,10 +346,15 @@ function buildCardNewRequest(cardData) {
   const expDate = `${expiryMonth}${expiryYear.slice(-2)}`;
   const cardBrand = getCardBrand(cardNumber);
   
-  // Signature for card-new: timestamp.merchantid.orderid..payerref.chname.cardnumber
-  const signature = `${timestamp}.${config.merchantId}.${orderId}..${payerRef}.${cardHolderName}.${cardNumber}`;
+  // Signature for card-new: timestamp.merchantid.orderid.amount.currency.payerref.chname.cardnumber
+  // For card-new (no payment), amount and currency are empty strings
+  const signature = `${timestamp}.${config.merchantId}.${orderId}...${payerRef}.${cardHolderName}.${cardNumber}`;
   const hash1 = generateSha1Hash(signature);
   const sha1hash = generateSha1Hash(`${hash1}.${config.sharedSecret}`);
+  
+  console.log('Card-new signature string:', signature);
+  console.log('Card-new hash1:', hash1);
+  console.log('Card-new sha1hash:', sha1hash);
   
   return `<?xml version="1.0" encoding="UTF-8"?>
 <request timestamp="${timestamp}" type="card-new">
