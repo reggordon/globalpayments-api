@@ -7,17 +7,34 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
+const bcrypt = require('bcrypt');
+const session = require('express-session');
+const jwt = require('jsonwebtoken');
+const { body, validationResult } = require('express-validator');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const TRANSACTIONS_FILE = path.join(__dirname, 'data', 'transactions.json');
 const HPP_TRANSACTIONS_FILE = path.join(__dirname, 'data', 'hpp-transactions.json');
 const STORED_CARDS_FILE = path.join(__dirname, 'data', 'stored-cards.json');
+const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 
 // Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
 
 // Load configuration from environment variables
 const config = {
@@ -151,6 +168,66 @@ function deleteStoredCard(token) {
   }
 }
 
+// User management helper functions
+function loadUsers() {
+  try {
+    const data = fs.readFileSync(USERS_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error loading users:', error);
+    return [];
+  }
+}
+
+function saveUser(user) {
+  try {
+    const users = loadUsers();
+    users.push(user);
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+    console.log('User saved:', user.email);
+    return true;
+  } catch (error) {
+    console.error('Error saving user:', error);
+    return false;
+  }
+}
+
+function updateUser(userId, updates) {
+  try {
+    const users = loadUsers();
+    const userIndex = users.findIndex(u => u.id === userId);
+    if (userIndex !== -1) {
+      users[userIndex] = { ...users[userIndex], ...updates };
+      fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+      console.log('User updated:', userId);
+      return users[userIndex];
+    }
+    return null;
+  } catch (error) {
+    console.error('Error updating user:', error);
+    return null;
+  }
+}
+
+function findUserByEmail(email) {
+  const users = loadUsers();
+  return users.find(user => user.email.toLowerCase() === email.toLowerCase());
+}
+
+function findUserById(userId) {
+  const users = loadUsers();
+  return users.find(user => user.id === userId);
+}
+
+// Authentication middleware
+function requireAuth(req, res, next) {
+  if (req.session && req.session.userId) {
+    next();
+  } else {
+    res.status(401).json({ success: false, message: 'Authentication required' });
+  }
+}
+
 // Helper function to generate timestamp
 function getTimestamp() {
   const now = new Date();
@@ -182,6 +259,160 @@ function generateSignature(timestamp, merchantId, orderId, amount, currency, car
   console.log('Final Hash:', hash2);
   
   return hash2;
+}
+
+// Helper function to build payer-new request (create GP customer)
+function buildPayerNewRequest(payerData) {
+  const { payerRef, firstName, lastName, email, timestamp } = payerData;
+  
+  // Signature for payer-new: timestamp.merchantid.orderid.amount.currency.payerref
+  const orderId = `PAYER-${Date.now()}`;
+  const signature = `${timestamp}.${config.merchantId}.${orderId}...${payerRef}`;
+  const hash1 = generateSha1Hash(signature);
+  const sha1hash = generateSha1Hash(`${hash1}.${config.sharedSecret}`);
+  
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<request timestamp="${timestamp}" type="payer-new">
+  <merchantid>${config.merchantId}</merchantid>
+  <orderid>${orderId}</orderid>
+  <payer ref="${payerRef}" type="Retail">
+    <firstname>${firstName}</firstname>
+    <surname>${lastName}</surname>
+    <email>${email}</email>
+  </payer>
+  <sha1hash>${sha1hash}</sha1hash>
+</request>`;
+}
+
+// Helper function to create GP customer
+async function createGPCustomer(user) {
+  try {
+    const payerRef = `PAYER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const timestamp = getTimestamp();
+    
+    // Split name into first and last
+    const nameParts = user.name.split(' ');
+    const firstName = nameParts[0] || user.name;
+    const lastName = nameParts.slice(1).join(' ') || firstName;
+    
+    const xmlRequest = buildPayerNewRequest({
+      payerRef,
+      firstName,
+      lastName,
+      email: user.email,
+      timestamp
+    });
+    
+    console.log('\n=== Creating GP Customer ===');
+    console.log('PayerRef:', payerRef);
+    console.log('XML Request:', xmlRequest);
+    
+    const response = await axios.post(config.apiUrl, xmlRequest, {
+      headers: { 'Content-Type': 'application/xml' }
+    });
+    
+    console.log('GP Response:', response.data);
+    
+    // Parse response to check success
+    const parsedResponse = parseXmlResponse(response.data);
+    
+    if (parsedResponse.resultCode === '00') {
+      console.log('✓ GP Customer created successfully');
+      return { success: true, payerRef };
+    } else {
+      console.error('✗ GP Customer creation failed:', parsedResponse.message);
+      return { success: false, error: parsedResponse.message };
+    }
+  } catch (error) {
+    console.error('Error creating GP customer:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// Helper function to build card-new request (store card in GP RealVault)
+function buildCardNewRequest(cardData) {
+  const { payerRef, cardRef, cardNumber, cardHolderName, expiryMonth, expiryYear, timestamp } = cardData;
+  
+  const orderId = `CARD-${Date.now()}`;
+  const expDate = `${expiryMonth}${expiryYear.slice(-2)}`;
+  const cardBrand = getCardBrand(cardNumber);
+  
+  // Signature for card-new: timestamp.merchantid.orderid..payerref.chname.cardnumber
+  const signature = `${timestamp}.${config.merchantId}.${orderId}..${payerRef}.${cardHolderName}.${cardNumber}`;
+  const hash1 = generateSha1Hash(signature);
+  const sha1hash = generateSha1Hash(`${hash1}.${config.sharedSecret}`);
+  
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<request timestamp="${timestamp}" type="card-new">
+  <merchantid>${config.merchantId}</merchantid>
+  <orderid>${orderId}</orderid>
+  <card>
+    <ref>${cardRef}</ref>
+    <payerref>${payerRef}</payerref>
+    <number>${cardNumber}</number>
+    <expdate>${expDate}</expdate>
+    <chname>${cardHolderName}</chname>
+    <type>${cardBrand}</type>
+  </card>
+  <sha1hash>${sha1hash}</sha1hash>
+</request>`;
+}
+
+// Helper function to store card in GP RealVault
+async function storeCardInGP(user, cardDetails) {
+  try {
+    // Ensure user has GP customer reference
+    if (!user.gpPayerRef) {
+      console.log('User has no GP customer, creating one...');
+      const gpResult = await createGPCustomer(user);
+      if (!gpResult.success) {
+        return { success: false, error: 'Failed to create GP customer' };
+      }
+      updateUser(user.id, { gpPayerRef: gpResult.payerRef });
+      user.gpPayerRef = gpResult.payerRef;
+    }
+    
+    const cardRef = `CARD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const timestamp = getTimestamp();
+    
+    const xmlRequest = buildCardNewRequest({
+      payerRef: user.gpPayerRef,
+      cardRef,
+      cardNumber: cardDetails.cardNumber,
+      cardHolderName: cardDetails.cardHolderName,
+      expiryMonth: cardDetails.expiryMonth,
+      expiryYear: cardDetails.expiryYear,
+      timestamp
+    });
+    
+    console.log('\n=== Storing Card in GP RealVault ===');
+    console.log('PayerRef:', user.gpPayerRef);
+    console.log('CardRef:', cardRef);
+    console.log('XML Request:', xmlRequest);
+    
+    const response = await axios.post(config.apiUrl, xmlRequest, {
+      headers: { 'Content-Type': 'application/xml' }
+    });
+    
+    console.log('GP Response:', response.data);
+    
+    const parsedResponse = parseXmlResponse(response.data);
+    
+    if (parsedResponse.resultCode === '00') {
+      console.log('✓ Card stored in GP RealVault successfully');
+      return { 
+        success: true, 
+        cardRef,
+        payerRef: user.gpPayerRef 
+      };
+    } else {
+      console.error('✗ Card storage failed:', parsedResponse.message);
+      return { success: false, error: parsedResponse.message };
+    }
+  } catch (error) {
+    console.error('Error storing card in GP:', error.message);
+    return { success: false, error: error.message };
+  }
 }
 
 // Helper function to build XML request
@@ -340,6 +571,222 @@ function parseXmlResponse(xmlString) {
   return result;
 }
 
+// ==================== AUTHENTICATION ROUTES ====================
+
+// Register new user
+app.post('/api/register', [
+  body('email').isEmail().normalizeEmail(),
+  body('password').isLength({ min: 8 }),
+  body('name').trim().notEmpty()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+
+  const { email, password, name } = req.body;
+
+  // Check if user already exists
+  if (findUserByEmail(email)) {
+    return res.status(400).json({ success: false, message: 'Email already registered' });
+  }
+
+  try {
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create user
+    const user = {
+      id: uuidv4(),
+      email,
+      name,
+      passwordHash,
+      createdAt: new Date().toISOString(),
+      gpPayerRef: null // Will be populated when GP customer is created
+    };
+
+    // Save user first
+    if (!saveUser(user)) {
+      return res.status(500).json({ success: false, message: 'Error creating user' });
+    }
+
+    // Create GP customer
+    console.log('\n=== Creating GP Customer for new user ===');
+    const gpResult = await createGPCustomer(user);
+    
+    if (gpResult.success) {
+      // Update user with GP payerRef
+      const updatedUser = updateUser(user.id, { gpPayerRef: gpResult.payerRef });
+      console.log('✓ User linked to GP customer:', gpResult.payerRef);
+    } else {
+      console.warn('⚠ GP customer creation failed, user created without GP link:', gpResult.error);
+      // Continue anyway - user can still use the system
+    }
+
+    // Create session
+    req.session.userId = user.id;
+    req.session.userEmail = user.email;
+
+    // Save session explicitly before responding
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ success: false, message: 'Session error' });
+      }
+
+      res.json({
+        success: true,
+        message: 'Registration successful',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Login user
+app.post('/api/login', [
+  body('email').isEmail().normalizeEmail(),
+  body('password').notEmpty()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, errors: errors.array() });
+  }
+
+  const { email, password } = req.body;
+
+  try {
+    // Find user
+    const user = findUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    // Verify password
+    const passwordMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!passwordMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    // Create session
+    req.session.userId = user.id;
+    req.session.userEmail = user.email;
+
+    // Save session explicitly before responding
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ success: false, message: 'Session error' });
+      }
+
+      res.json({
+        success: true,
+        message: 'Login successful',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Logout user
+app.post('/api/logout', (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: 'Error logging out' });
+    }
+    res.clearCookie('connect.sid');
+    res.json({ success: true, message: 'Logout successful' });
+  });
+});
+
+// Get current user
+app.get('/api/user', requireAuth, (req, res) => {
+  const user = findUserById(req.session.userId);
+  if (user) {
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name
+      }
+    });
+  } else {
+    res.status(404).json({ success: false, message: 'User not found' });
+  }
+});
+
+// Get user's transactions
+app.get('/api/user/transactions', requireAuth, (req, res) => {
+  try {
+    const allTransactions = loadTransactions();
+    const userId = req.session.userId;
+    
+    // Filter transactions for this user
+    const userTransactions = allTransactions.filter(t => t.userId === userId);
+    
+    // Sort by timestamp (newest first) and limit to recent 50
+    const recentTransactions = userTransactions
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, 50);
+    
+    res.json({
+      success: true,
+      transactions: recentTransactions
+    });
+  } catch (error) {
+    console.error('Error fetching user transactions:', error);
+    res.status(500).json({ success: false, message: 'Error fetching transactions' });
+  }
+});
+
+// Get user's saved cards
+app.get('/api/user/cards', requireAuth, (req, res) => {
+  try {
+    const allCards = loadStoredCards();
+    const userId = req.session.userId;
+    
+    // Filter cards for this user
+    const userCards = allCards
+      .filter(card => card.userId === userId)
+      .map(card => ({
+        token: card.token,
+        maskedCardNumber: card.maskedCardNumber,
+        cardBrand: card.cardBrand,
+        cardHolderName: card.cardHolderName,
+        expiryMonth: card.expiryMonth,
+        expiryYear: card.expiryYear,
+        createdAt: card.createdAt,
+        lastUsed: card.lastUsed,
+        storedInRealvault: card.storedInRealvault
+      }));
+    
+    res.json({
+      success: true,
+      cards: userCards
+    });
+  } catch (error) {
+    console.error('Error fetching user cards:', error);
+    res.status(500).json({ success: false, message: 'Error fetching cards' });
+  }
+});
+
+// ==================== PAYMENT ROUTES ====================
+
 // Route: Home page
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -420,6 +867,7 @@ app.post('/process-payment', async (req, res) => {
       authCode: parsedResponse.authCode,
       pasRef: parsedResponse.pasRef,
       account: config.account,
+      userId: req.session && req.session.userId ? req.session.userId : null, // Link to logged-in user
       rawResponse: response.data  // Store raw XML response from gateway
     };
     
@@ -467,6 +915,7 @@ app.post('/process-payment', async (req, res) => {
       success: false,
       authCode: null,
       pasRef: null,
+      userId: req.session && req.session.userId ? req.session.userId : null,
       account: config.account
     };
     
@@ -745,121 +1194,80 @@ app.get('/stored-cards', (req, res) => {
 // Route: Store a new card (tokenization)
 // This endpoint saves card details after successful payment or from the stored cards page
 app.post('/store-card', async (req, res) => {
-  const { cardNumber, cardHolderName, expiryMonth, expiryYear, cvv, customerEmail, pasRef, authCode } = req.body;
+  const { cardNumber, cardHolderName, expiryMonth, expiryYear, cvv, customerEmail } = req.body;
   
   console.log('\n=== Storing Card ===');
   console.log('Card Holder:', cardHolderName);
-  console.log('Customer Email:', customerEmail);
-  console.log('Realvault Enabled:', config.realvaultEnabled);
+  console.log('Logged in:', req.session && req.session.userId ? 'Yes' : 'No');
   
   try {
-    let token, maskedCardNumber, cardBrand, payerRef;
+    let cardRef, payerRef, userId = null;
+    const maskedCardNumber = cardNumber.slice(0, 6) + '****' + cardNumber.slice(-4);
+    const cardBrand = getCardBrand(cardNumber);
     
-    if (config.realvaultEnabled) {
-      // Use Realvault to store card securely
-      console.log('Using Realvault for card storage...');
+    // Check if user is logged in
+    if (req.session && req.session.userId) {
+      userId = req.session.userId;
+      const user = findUserById(userId);
       
-      // Generate unique payer reference
-      payerRef = `PAYER-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const cardRef = `CARD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Build XML request for Realvault card storage
-      const timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
-      const orderId = `STORE-${Date.now()}`;
-      
-      // Create payer-new request to store card
-      const signature = `${timestamp}.${config.merchantId}.${orderId}..${payerRef}`;
-      const hash1 = crypto.createHash('sha1').update(signature).digest('hex');
-      const hash2 = crypto.createHash('sha1').update(`${hash1}.${config.sharedSecret}`).digest('hex');
-      
-      const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
-<request type="card-new" timestamp="${timestamp}">
-  <merchantid>${config.merchantId}</merchantid>
-  <orderid>${orderId}</orderid>
-  <card>
-    <ref>${cardRef}</ref>
-    <payerref>${payerRef}</payerref>
-    <number>${cardNumber}</number>
-    <expdate>${expiryMonth}${expiryYear.slice(-2)}</expdate>
-    <chname>${cardHolderName}</chname>
-    <type>${getCardBrand(cardNumber)}</type>
-  </card>
-  <sha1hash>${hash2}</sha1hash>
-</request>`;
-
-      console.log('=== Realvault XML Request ===');
-      console.log(xmlRequest);
-      
-      // Send request to Global Payments
-      const response = await axios.post(config.apiUrl, xmlRequest, {
-        headers: {
-          'Content-Type': 'text/xml'
+      if (user) {
+        console.log('✓ User authenticated:', user.email);
+        
+        // Store card in GP RealVault
+        const gpResult = await storeCardInGP(user, {
+          cardNumber,
+          cardHolderName,
+          expiryMonth,
+          expiryYear
+        });
+        
+        if (gpResult.success) {
+          cardRef = gpResult.cardRef;
+          payerRef = gpResult.payerRef;
+          console.log('✓ Card stored in GP RealVault');
+        } else {
+          console.warn('⚠ GP storage failed, storing locally:', gpResult.error);
+          // Fall back to local storage
+          cardRef = `CARD-LOCAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         }
-      });
-      
-      console.log('=== Realvault XML Response ===');
-      console.log(response.data);
-      
-      // Parse response
-      const resultMatch = response.data.match(/<result>(.*?)<\/result>/);
-      const messageMatch = response.data.match(/<message>(.*?)<\/message>/);
-      const pasrefMatch = response.data.match(/<pasref>(.*?)<\/pasref>/);
-      
-      const resultCode = resultMatch ? resultMatch[1] : null;
-      const message = messageMatch ? messageMatch[1] : null;
-      const pasref = pasrefMatch ? pasrefMatch[1] : null;
-      
-      if (resultCode !== '00') {
-        throw new Error(`Realvault storage failed: ${message}`);
       }
-      
-      token = cardRef;
-      maskedCardNumber = cardNumber.slice(0, 6) + '****' + cardNumber.slice(-4);
-      cardBrand = getCardBrand(cardNumber);
-      
-      console.log('✅ Card stored in Realvault:', cardRef);
-      console.log('Payer Reference:', payerRef);
-      
     } else {
-      // Local storage fallback (for demo/testing without Realvault)
-      console.log('Realvault not enabled, using local storage...');
-      token = `CARD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      maskedCardNumber = cardNumber.slice(0, 6) + '****' + cardNumber.slice(-4);
-      cardBrand = getCardBrand(cardNumber);
+      console.log('⚠ No user logged in, storing locally');
+      cardRef = `CARD-LOCAL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     }
     
     // Store card metadata locally
     const cardData = {
-      token: token,
-      payerRef: payerRef || null,
-      maskedCardNumber: maskedCardNumber,
-      cardBrand: cardBrand,
-      cardHolderName: cardHolderName,
-      expiryMonth: expiryMonth,
-      expiryYear: expiryYear,
+      token: cardRef,
+      userId: userId, // Link to user
+      gpPayerRef: payerRef || null, // GP customer reference
+      gpCardRef: payerRef ? cardRef : null, // GP card reference (only if stored in GP)
+      maskedCardNumber,
+      cardBrand,
+      cardHolderName,
+      expiryMonth,
+      expiryYear,
       customerEmail: customerEmail || 'N/A',
       createdAt: new Date().toISOString(),
       lastUsed: null,
       cardNumberLast4: cardNumber.slice(-4),
       cardNumberFirst6: cardNumber.slice(0, 6),
-      pasRef: pasRef || null,
-      authCode: authCode || null,
-      storedInRealvault: config.realvaultEnabled
+      storedInRealvault: !!payerRef // true if stored in GP
     };
     
     saveStoredCard(cardData);
     
-    console.log('✅ Card metadata saved:', token);
+    console.log('✅ Card metadata saved');
     
     res.json({
       success: true,
-      message: config.realvaultEnabled 
-        ? 'Card stored securely in Realvault' 
-        : 'Card stored locally (enable Realvault for secure storage)',
-      token: token,
-      maskedCardNumber: maskedCardNumber,
-      cardBrand: cardBrand,
-      realvaultEnabled: config.realvaultEnabled
+      message: payerRef 
+        ? 'Card stored securely in Global Payments RealVault' 
+        : 'Card stored locally',
+      token: cardRef,
+      maskedCardNumber,
+      cardBrand,
+      realvaultEnabled: !!payerRef
     });
     
   } catch (error) {
@@ -878,7 +1286,7 @@ app.post('/charge-stored-card', async (req, res) => {
   console.log('\n=== Charging Stored Card ===');
   console.log('Token:', token);
   console.log('Amount:', amount);
-  console.log('Realvault Enabled:', config.realvaultEnabled);
+  console.log('Currency:', currency);
   
   try {
     // Find the stored card
@@ -891,103 +1299,94 @@ app.post('/charge-stored-card', async (req, res) => {
         message: 'Card not found'
       });
     }
-    
-    if (!config.realvaultEnabled) {
+
+    // Check if card is stored in GP RealVault
+    if (!card.storedInRealvault || !card.gpPayerRef || !card.gpCardRef) {
       return res.status(400).json({
         success: false,
-        message: 'Stored card charging requires Global Payments Realvault integration. Please contact Global Payments support to enable card storage and tokenization for your merchant account.',
-        note: 'This is a limitation of the sandbox/demo environment. In production, you would use Global Payments Realvault or Card Storage API.'
+        message: 'This card is not stored in Global Payments RealVault. Please save the card again while logged in to enable stored card payments.'
       });
     }
     
-    if (!card.storedInRealvault || !card.payerRef) {
-      return res.status(400).json({
-        success: false,
-        message: 'This card was not stored in Realvault and cannot be charged. Please re-save the card with Realvault enabled.'
-      });
-    }
+    // Use GP RealVault receipt-in to charge the stored card
+    console.log('Charging card via GP RealVault...');
+    console.log('Payer Ref:', card.gpPayerRef);
+    console.log('Card Ref:', card.gpCardRef);
     
-    // Use Realvault to charge the stored card
-    console.log('Charging card via Realvault...');
-    console.log('Payer Ref:', card.payerRef);
-    console.log('Card Ref:', card.token);
-    
-    const timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
+    const timestamp = getTimestamp();
     const orderId = `CHARGE-${Date.now()}`;
-    const amountInCents = Math.round(amount * 100);
+    const amountInCents = Math.round(amount * 100).toString();
     
-    // Build signature for receipt-in request
-    const signature = `${timestamp}.${config.merchantId}.${orderId}.${amountInCents}.${currency}.${card.payerRef}`;
-    const hash1 = crypto.createHash('sha1').update(signature).digest('hex');
-    const hash2 = crypto.createHash('sha1').update(`${hash1}.${config.sharedSecret}`).digest('hex');
+    // Build signature for receipt-in request: timestamp.merchantid.orderid.amount.currency.payerref
+    const signature = `${timestamp}.${config.merchantId}.${orderId}.${amountInCents}.${currency}.${card.gpPayerRef}`;
+    const hash1 = generateSha1Hash(signature);
+    const sha1hash = generateSha1Hash(`${hash1}.${config.sharedSecret}`);
     
     const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
 <request type="receipt-in" timestamp="${timestamp}">
   <merchantid>${config.merchantId}</merchantid>
-  <account>${config.realvaultAccount}</account>
+  <account>${config.account}</account>
   <orderid>${orderId}</orderid>
   <amount currency="${currency}">${amountInCents}</amount>
-  <payerref>${card.payerRef}</payerref>
-  <paymentmethod>${card.token}</paymentmethod>
+  <payerref>${card.gpPayerRef}</payerref>
+  <paymentmethod>${card.gpCardRef}</paymentmethod>
   <autosettle flag="1"/>
-  <sha1hash>${hash2}</sha1hash>
+  <sha1hash>${sha1hash}</sha1hash>
 </request>`;
 
-    console.log('=== Realvault Charge XML Request ===');
+    console.log('=== GP RealVault Charge XML Request ===');
     console.log(xmlRequest);
     
     // Send request to Global Payments
     const response = await axios.post(config.apiUrl, xmlRequest, {
       headers: {
-        'Content-Type': 'text/xml'
+        'Content-Type': 'application/xml'
       }
     });
     
-    console.log('=== Realvault Charge XML Response ===');
+    console.log('=== GP Response ===');
     console.log(response.data);
     
     // Parse response
-    const resultMatch = response.data.match(/<result>(.*?)<\/result>/);
-    const messageMatch = response.data.match(/<message>(.*?)<\/message>/);
-    const authCodeMatch = response.data.match(/<authcode>(.*?)<\/authcode>/);
-    const pasrefMatch = response.data.match(/<pasref>(.*?)<\/pasref>/);
+    const parsedResponse = parseXmlResponse(response.data);
+    const isSuccess = parsedResponse.resultCode === '00';
     
-    const resultCode = resultMatch ? resultMatch[1] : null;
-    const message = messageMatch ? messageMatch[1] : null;
-    const authCode = authCodeMatch ? authCodeMatch[1] : null;
-    const pasref = pasrefMatch ? pasrefMatch[1] : null;
-    
-    if (resultCode !== '00') {
+    if (!isSuccess) {
       return res.status(400).json({
         success: false,
-        resultCode: resultCode,
-        message: message || 'Payment failed'
+        resultCode: parsedResponse.resultCode,
+        message: parsedResponse.message || 'Payment failed'
       });
     }
     
     // Update card last used timestamp
-    card.lastUsed = new Date().toISOString();
-    const allCards = cards.map(c => c.token === token ? card : c);
-    fs.writeFileSync(STORED_CARDS_FILE, JSON.stringify(allCards, null, 2));
+    const updatedCards = cards.map(c => 
+      c.token === token 
+        ? { ...c, lastUsed: new Date().toISOString() }
+        : c
+    );
+    fs.writeFileSync(STORED_CARDS_FILE, JSON.stringify(updatedCards, null, 2));
     
     // Save transaction
     const transaction = {
       orderId: orderId,
-      amount: amount,
-      currency: currency,
-      resultCode: resultCode,
-      message: message,
-      authCode: authCode,
-      pasRef: pasref,
       timestamp: new Date().toISOString(),
-      cardToken: token,
+      amount: parseFloat(amount),
+      currency: currency,
+      cardHolderName: card.cardHolderName,
       maskedCardNumber: card.maskedCardNumber,
-      success: true
+      resultCode: parsedResponse.resultCode,
+      message: parsedResponse.message,
+      success: isSuccess,
+      authCode: parsedResponse.authCode,
+      pasRef: parsedResponse.pasRef,
+      account: config.account,
+      userId: card.userId || null, // Link to user if available
+      paymentMethod: 'stored-card',
+      cardToken: token
     };
     
-    const transactions = loadTransactions();
-    transactions.unshift(transaction);
-    fs.writeFileSync(TRANSACTIONS_FILE, JSON.stringify(transactions, null, 2));
+    saveTransaction(transaction);
     
     console.log('✅ Stored card charged successfully');
     
@@ -996,8 +1395,8 @@ app.post('/charge-stored-card', async (req, res) => {
       orderId: orderId,
       amount: amount,
       currency: currency,
-      authCode: authCode,
-      message: message,
+      authCode: parsedResponse.authCode,
+      message: parsedResponse.message,
       maskedCardNumber: card.maskedCardNumber
     });
     
