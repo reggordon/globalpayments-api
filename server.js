@@ -1222,17 +1222,20 @@ app.post('/hpp-response', (req, res) => {
     valid: isValid
   });
   
-  // Build result URL with parameters
-  const params = new URLSearchParams({
-    result: RESULT,
-    message: MESSAGE,
-    orderId: ORDER_ID,
-    authCode: AUTHCODE || '',
-    pasRef: PASREF || '',
-    valid: isValid.toString(),
-    amount: AMOUNT ? (parseFloat(AMOUNT) / 100).toFixed(2) : '0',
-    currency: CURRENCY || ''
-  });
+  // Build result URL with parameters - only include defined values
+  const params = new URLSearchParams();
+  if (RESULT !== undefined) params.append('result', RESULT);
+  if (MESSAGE !== undefined) params.append('message', MESSAGE);
+  if (ORDER_ID !== undefined) params.append('orderId', ORDER_ID);
+  if (AUTHCODE) params.append('authCode', AUTHCODE);
+  if (PASREF) params.append('pasRef', PASREF);
+  params.append('valid', isValid.toString());
+  if (AMOUNT !== undefined) {
+    params.append('amount', (parseFloat(AMOUNT) / 100).toFixed(2));
+  } else {
+    params.append('amount', '0');
+  }
+  if (CURRENCY) params.append('currency', CURRENCY);
   
   const resultUrl = `/hpp-result.html?${params.toString()}`;
   
@@ -1319,16 +1322,19 @@ app.get('/hpp-response', (req, res) => {
   });
   
   // Return HTML that redirects properly (same as POST handler)
-  const params = new URLSearchParams({
-    result: RESULT,
-    message: MESSAGE,
-    orderId: ORDER_ID,
-    authCode: AUTHCODE || '',
-    pasRef: PASREF || '',
-    valid: isValid.toString(),
-    amount: AMOUNT ? (parseFloat(AMOUNT) / 100).toFixed(2) : '0',
-    currency: CURRENCY || ''
-  });
+  const params = new URLSearchParams();
+  if (RESULT !== undefined) params.append('result', RESULT);
+  if (MESSAGE !== undefined) params.append('message', MESSAGE);
+  if (ORDER_ID !== undefined) params.append('orderId', ORDER_ID);
+  if (AUTHCODE) params.append('authCode', AUTHCODE);
+  if (PASREF) params.append('pasRef', PASREF);
+  params.append('valid', isValid.toString());
+  if (AMOUNT !== undefined) {
+    params.append('amount', (parseFloat(AMOUNT) / 100).toFixed(2));
+  } else {
+    params.append('amount', '0');
+  }
+  if (CURRENCY) params.append('currency', CURRENCY);
   
   const resultUrl = `/hpp-result.html?${params.toString()}`;
   
