@@ -18,6 +18,10 @@
             <a href="/dropin.html">🎨 Try Drop-In UI</a>
             <a href="/transactions.html">📊 API Transactions</a>
             <a href="/hpp-transactions.html">🔐 HPP Transactions</a>
+            <span id="authLinks">
+                <a href="/login.html">🔑 Login</a>
+                <a href="/register.html">📝 Register</a>
+            </span>
         </div>
 
         <div class="info-box">
@@ -152,6 +156,31 @@
         cvvInput.addEventListener('input', function(e) {
             e.target.value = e.target.value.replace(/\D/g, '');
         });
+
+        // Check auth status and update nav
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/user');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.user) {
+                        document.getElementById('authLinks').innerHTML = `
+                            <a href="/profile.html">👤 Profile</a>
+                            <a href="#" onclick="logout(); return false;">🚪 Logout</a>
+                        `;
+                    }
+                }
+            } catch (error) {
+                // User not logged in, keep default links
+            }
+        }
+
+        async function logout() {
+            await fetch('/api/logout', { method: 'POST' });
+            window.location.reload();
+        }
+
+        checkAuthStatus();
     </script>
     <script src="/js/theme-switcher.js"></script>
 </body>

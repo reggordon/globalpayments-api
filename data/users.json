@@ -5,5 +5,12 @@
     "name": "Rex Testerson",
     "passwordHash": "$2b$10$HblnCkBmtT32aX/tFwqAy.AZC3UDTKYWcNLB4bgXsAsznlm6Z2eF2",
     "createdAt": "2025-11-07T15:44:54.174Z"
+  },
+  {
+    "id": "f3541392-ab82-4aef-b005-59f1c1513058",
+    "email": "reggordonphoto@gmail.com",
+    "name": "rex testerson",
+    "passwordHash": "$2b$10$MqCddlC4thEIznOucmRFnu9azmidVt7cBw5T941.gxgimMWTqKX8S",
+    "createdAt": "2025-11-07T15:55:35.683Z"
   }
 ]
