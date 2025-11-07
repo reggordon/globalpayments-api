@@ -1,0 +1,95 @@
+/* HPP Result Page Styles */
+
+.success-page {
+    text-align: center;
+    padding: 40px 20px;
+}
+
+.success-icon {
+    font-size: 80px;
+    margin-bottom: 20px;
+}
+
+.success-icon.success {
+    color: #10b981;
+}
+
+.success-icon.error {
+    color: #ef4444;
+}
+
+.success-title {
+    font-size: 32px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+    color: #f1f5f9;
+}
+
+.success-title.success {
+    color: #10b981;
+}
+
+.success-title.error {
+    color: #ef4444;
+}
+
+.success-message {
+    font-size: 18px;
+    color: #94a3b8;
+    margin-bottom: 30px;
+}
+
+.transaction-details {
+    background: #1e293b;
+    border: 1px solid #334155;
+    padding: 20px;
+    margin: 30px 0;
+    text-align: left;
+}
+
+.transaction-details h3 {
+    margin-top: 0;
+    font-size: 18px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #3b82f6;
+    margin-bottom: 15px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #334155;
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    font-weight: 500;
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+.detail-value {
+    color: #f1f5f9;
+    font-size: 14px;
+}
+
+.detail-value strong {
+    color: #3b82f6;
+}
+
+.detail-value code {
+    background: #0f172a;
+    border: 1px solid #334155;
+    padding: 2px 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #3b82f6;
+}
