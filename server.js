@@ -627,14 +627,22 @@ app.post('/api/register', [
     req.session.userId = user.id;
     req.session.userEmail = user.email;
 
-    res.json({
-      success: true,
-      message: 'Registration successful',
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name
+    // Save session explicitly before responding
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ success: false, message: 'Session error' });
       }
+
+      res.json({
+        success: true,
+        message: 'Registration successful',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name
+        }
+      });
     });
   } catch (error) {
     console.error('Registration error:', error);
@@ -671,14 +679,22 @@ app.post('/api/login', [
     req.session.userId = user.id;
     req.session.userEmail = user.email;
 
-    res.json({
-      success: true,
-      message: 'Login successful',
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name
+    // Save session explicitly before responding
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ success: false, message: 'Session error' });
       }
+
+      res.json({
+        success: true,
+        message: 'Login successful',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name
+        }
+      });
     });
   } catch (error) {
     console.error('Login error:', error);

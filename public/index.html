@@ -5,8 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Global Payments API - Sandbox</title>
     <link rel="stylesheet" href="/css/main.css">
+    <style>
+        .profile-link {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 1000;
+            transition: background 0.3s;
+        }
+        .profile-link:hover {
+            background: #2980b9;
+        }
+    </style>
 </head>
 <body>
+    <div id="profileLinkContainer"></div>
     <div class="container">
         <h1>Global Payments API</h1>
         <p class="subtitle">Direct API Integration - Sandbox</p>
@@ -164,14 +184,27 @@
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success && data.user) {
+                        // Update main nav
                         document.getElementById('authLinks').innerHTML = `
                             <a href="/profile.html">👤 Profile</a>
                             <a href="#" onclick="logout(); return false;">🚪 Logout</a>
                         `;
+                        // Add floating profile link
+                        document.getElementById('profileLinkContainer').innerHTML = `
+                            <a href="/profile.html" class="profile-link">👤 ${data.user.name}</a>
+                        `;
+                    } else {
+                        // Add login link
+                        document.getElementById('profileLinkContainer').innerHTML = `
+                            <a href="/login.html" class="profile-link">🔑 Login</a>
+                        `;
                     }
                 }
             } catch (error) {
-                // User not logged in, keep default links
+                // User not logged in, add login link
+                document.getElementById('profileLinkContainer').innerHTML = `
+                    <a href="/login.html" class="profile-link">🔑 Login</a>
+                `;
             }
         }
 
