@@ -24,6 +24,9 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
+// Trust proxy for Cloud Run (required for secure cookies)
+app.set('trust proxy', 1);
+
 // Session configuration
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
@@ -222,9 +225,14 @@ function findUserById(userId) {
 
 // Authentication middleware
 function requireAuth(req, res, next) {
+  console.log('requireAuth - Session:', req.session);
+  console.log('requireAuth - Session ID:', req.sessionID);
+  console.log('requireAuth - User ID:', req.session ? req.session.userId : 'NO SESSION');
+  
   if (req.session && req.session.userId) {
     next();
   } else {
+    console.log('requireAuth - REJECTED: No valid session');
     res.status(401).json({ success: false, message: 'Authentication required' });
   }
 }
@@ -716,6 +724,9 @@ app.post('/api/logout', (req, res) => {
 
 // Get current user
 app.get('/api/user', requireAuth, (req, res) => {
+  console.log('GET /api/user - Session ID:', req.sessionID);
+  console.log('GET /api/user - User ID from session:', req.session.userId);
+  
   const user = findUserById(req.session.userId);
   if (user) {
     res.json({
