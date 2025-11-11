@@ -66,6 +66,7 @@ globalpayments-api/
 - ✅ Transaction history & filtering
 - ✅ Responsive modern UI
 - ✅ All card types (VISA, MC, AMEX, JCB, DINERS)
+- ✅ **Session-based credential swapping** - Test multiple merchant accounts without restarting
 
 ## Quick Deploy
 
@@ -89,6 +90,56 @@ Production: https://payments.reggordon.com
 | GET | `/api/user/cards` | Saved cards |
 | POST | `/process-payment` | Direct payment |
 | POST | `/charge-stored-card` | Charge saved card |
+| POST | `/api/credentials/set` | Set session credentials |
+| POST | `/api/credentials/reset` | Reset to defaults |
+| GET | `/api/credentials/status` | Check active credentials |
+
+## Session-Based Credential Swapping
+
+Easily test multiple merchant accounts without restarting the server or editing `.env` files.
+
+### How It Works
+
+Visit `http://localhost:3001/` (Credentials Management page) to:
+- Set custom API and/or HPP credentials for your session
+- Override default credentials temporarily
+- Reset back to `.env` defaults anytime
+
+### Features
+
+- **Independent Configuration**: Set API credentials separately from HPP credentials
+- **Partial Overrides**: Override only what you need - defaults fill in the rest
+- **Session Isolation**: Each browser session has independent credentials
+- **No Server Restart**: Changes apply immediately without restarting
+- **Temporary**: Credentials reset when session expires or you click "Reset to Defaults"
+
+### Use Cases
+
+✅ Test different merchant accounts simultaneously  
+✅ Demo with client-specific credentials  
+✅ Switch between sandbox and production environments  
+✅ Team members can use their own test credentials  
+
+### Example
+
+```javascript
+// Set only API credentials (HPP uses defaults from .env)
+POST /api/credentials/set
+{
+  "apiMerchantId": "test_merchant_123",
+  "apiSharedSecret": "test_secret_456"
+}
+
+// Set only HPP credentials (API uses defaults from .env)
+POST /api/credentials/set
+{
+  "hppMerchantId": "demo_hpp_merchant",
+  "hppSharedSecret": "demo_secret"
+}
+
+// Reset everything back to .env defaults
+POST /api/credentials/reset
+```
 
 ## Test Cards
 
