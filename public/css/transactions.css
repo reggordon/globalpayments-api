@@ -22,6 +22,14 @@ body {
     align-items: center;
     border-radius: 0;
     border-bottom: 1px solid #334155;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.header > div:first-child {
+    display: flex;
+    align-items: center;
+    gap: 15px;
 }
 
 .header h1 {
@@ -30,6 +38,27 @@ body {
     margin: 0;
     font-weight: 700;
     letter-spacing: -0.5px;
+}
+
+.clear-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.clear-btn:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 .header a {

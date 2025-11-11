@@ -160,6 +160,30 @@ function copyResponse() {
     });
 }
 
+async function clearHppTransactions() {
+    if (!confirm('Are you sure you want to clear all HPP transaction history? This cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/hpp-transactions', {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('HPP transaction history cleared successfully');
+            loadStats();
+            loadTransactions();
+        } else {
+            alert('Failed to clear HPP transaction history: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error clearing HPP transactions:', error);
+        alert('Error clearing HPP transaction history');
+    }
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadStats();
