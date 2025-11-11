@@ -115,6 +115,7 @@ document.addEventListener('DOMContentLoaded', function() {
             border: none;
         `;
         iframe.name = 'hpp-lightbox-frame';
+        iframe.setAttribute('allow', 'payment');
 
         // Create form to POST to HPP in iframe
         const hppForm = document.createElement('form');

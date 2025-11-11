@@ -22,7 +22,6 @@ const USERS_FILE = path.join(__dirname, 'data', 'users.json');
 // Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static('public'));
 
 // Trust proxy for Cloud Run (required for secure cookies)
 app.set('trust proxy', 1);
@@ -39,6 +38,11 @@ app.use(session({
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax' // Allow cross-site cookies in production
   }
 }));
+
+// Serve static assets (CSS, JS, images) but not HTML files from root
+app.use('/css', express.static(path.join(__dirname, 'public', 'css')));
+app.use('/js', express.static(path.join(__dirname, 'public', 'js')));
+app.use('/.well-known', express.static(path.join(__dirname, 'public', '.well-known')));
 
 // Load configuration from environment variables
 const config = {
@@ -255,7 +259,8 @@ function generateSha1Hash(input) {
 }
 
 // Helper function to generate request signature
-function generateSignature(timestamp, merchantId, orderId, amount, currency, cardNumber) {
+function generateSignature(timestamp, merchantId, orderId, amount, currency, cardNumber, sharedSecret = null) {
+  const secret = sharedSecret || config.sharedSecret;
   // Step 1: timestamp.merchantid.orderid.amount.currency.cardnumber
   const step1 = `${timestamp}.${merchantId}.${orderId}.${amount}.${currency}.${cardNumber}`;
   console.log('Signature Step 1:', step1);
@@ -263,7 +268,7 @@ function generateSignature(timestamp, merchantId, orderId, amount, currency, car
   console.log('Hash 1:', hash1);
   
   // Step 2: hash1.secret
-  const step2 = `${hash1}.${config.sharedSecret}`;
+  const step2 = `${hash1}.${secret}`;
   const hash2 = generateSha1Hash(step2);
   console.log('Final Hash:', hash2);
   
@@ -430,7 +435,7 @@ async function storeCardInGP(user, cardDetails) {
 }
 
 // Helper function to build XML request
-function buildAuthRequest(orderData) {
+function buildAuthRequest(orderData, effectiveConfig = config) {
   const { orderId, amount, currency, cardNumber, cardHolderName, expiryMonth, expiryYear, cvv, timestamp } = orderData;
   
   // Ensure expiryYear is only 2 digits (convert 2025 -> 25)
@@ -441,17 +446,18 @@ function buildAuthRequest(orderData) {
   
   const signature = generateSignature(
     timestamp,
-    config.merchantId,
+    effectiveConfig.merchantId,
     orderId,
     amount,
     currency,
-    cardNumber
+    cardNumber,
+    effectiveConfig.sharedSecret
   );
   
   return `<?xml version="1.0" encoding="UTF-8"?>
 <request type="auth" timestamp="${timestamp}">
-  <merchantid>${config.merchantId}</merchantid>
-  <account>${config.account}</account>
+  <merchantid>${effectiveConfig.merchantId}</merchantid>
+  <account>${effectiveConfig.account}</account>
   <orderid>${orderId}</orderid>
   <amount currency="${currency}">${amount}</amount>
   <card>
@@ -802,16 +808,124 @@ app.get('/api/user/cards', requireAuth, (req, res) => {
   }
 });
 
+// ==================== CREDENTIAL MANAGEMENT ROUTES ====================
+
+// Helper function to get effective config (session credentials override defaults)
+function getEffectiveConfig(req) {
+  const sessionCreds = req.session.customCredentials || {};
+  
+  return {
+    merchantId: sessionCreds.apiMerchantId || config.merchantId,
+    account: sessionCreds.apiAccount || config.account,
+    sharedSecret: sessionCreds.apiSharedSecret || config.sharedSecret,
+    apiUrl: config.apiUrl,
+    hppMerchantId: sessionCreds.hppMerchantId || config.hppMerchantId,
+    hppAccount: sessionCreds.hppAccount || config.hppAccount,
+    hppSharedSecret: sessionCreds.hppSharedSecret || config.hppSharedSecret,
+    hppSandboxUrl: config.hppSandboxUrl,
+    hppResponseUrl: config.hppResponseUrl,
+    realvaultEnabled: config.realvaultEnabled,
+    realvaultAccount: config.realvaultAccount
+  };
+}
+
+// Check credential status
+app.get('/api/credentials/status', (req, res) => {
+  const usingCustomCredentials = !!(req.session.customCredentials && 
+                                     Object.keys(req.session.customCredentials).length > 0);
+  
+  res.json({
+    success: true,
+    usingCustomCredentials,
+    overrides: usingCustomCredentials ? Object.keys(req.session.customCredentials) : []
+  });
+});
+
+// Set custom credentials for session
+app.post('/api/credentials/set', (req, res) => {
+  try {
+    const {
+      apiMerchantId,
+      apiAccount,
+      apiSharedSecret,
+      hppMerchantId,
+      hppAccount,
+      hppSharedSecret
+    } = req.body;
+
+    // Store only provided values in session
+    req.session.customCredentials = {};
+    
+    if (apiMerchantId) req.session.customCredentials.apiMerchantId = apiMerchantId;
+    if (apiAccount) req.session.customCredentials.apiAccount = apiAccount;
+    if (apiSharedSecret) req.session.customCredentials.apiSharedSecret = apiSharedSecret;
+    if (hppMerchantId) req.session.customCredentials.hppMerchantId = hppMerchantId;
+    if (hppAccount) req.session.customCredentials.hppAccount = hppAccount;
+    if (hppSharedSecret) req.session.customCredentials.hppSharedSecret = hppSharedSecret;
+
+    logger.info('Custom credentials set for session', {
+      sessionId: req.sessionID,
+      overrides: Object.keys(req.session.customCredentials)
+    });
+
+    res.json({
+      success: true,
+      message: 'Custom credentials set for your session',
+      overrides: Object.keys(req.session.customCredentials)
+    });
+  } catch (error) {
+    logger.error('Error setting custom credentials', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error setting credentials'
+    });
+  }
+});
+
+// Reset to default credentials
+app.post('/api/credentials/reset', (req, res) => {
+  try {
+    const hadCustomCredentials = !!(req.session.customCredentials && 
+                                    Object.keys(req.session.customCredentials).length > 0);
+    
+    req.session.customCredentials = {};
+
+    logger.info('Credentials reset to defaults', {
+      sessionId: req.sessionID,
+      hadCustom: hadCustomCredentials
+    });
+
+    res.json({
+      success: true,
+      message: 'Credentials reset to defaults from .env file'
+    });
+  } catch (error) {
+    logger.error('Error resetting credentials', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error resetting credentials'
+    });
+  }
+});
+
 // ==================== PAYMENT ROUTES ====================
 
-// Route: Home page
+// Route: Home page - Credentials Management
 app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'credentials.html'));
+});
+
+// Route: Payment page
+app.get('/payment', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Route: Process payment via API
 app.post('/process-payment', async (req, res) => {
   const { amount, currency, cardNumber, cardHolderName, expiryMonth, expiryYear, cvv } = req.body;
+  
+  // Get effective config (session credentials override defaults)
+  const effectiveConfig = getEffectiveConfig(req);
   
   logger.info('Payment request received', {
     amount,
@@ -823,6 +937,7 @@ app.post('/process-payment', async (req, res) => {
   console.log('Amount:', amount);
   console.log('Currency:', currency);
   console.log('Card Holder:', cardHolderName);
+  console.log('Using Merchant ID:', effectiveConfig.merchantId);
   
   try {
     // Generate order data
@@ -841,7 +956,7 @@ app.post('/process-payment', async (req, res) => {
       expiryYear,
       cvv,
       timestamp
-    });
+    }, effectiveConfig);
     
     console.log('\n=== XML Request ===');
     console.log(xmlRequest);
@@ -849,7 +964,7 @@ app.post('/process-payment', async (req, res) => {
     logger.debug('Sending payment request to Global Payments API', { orderId });
     
     // Send request to Global Payments API
-    const response = await axios.post(config.apiUrl, xmlRequest, {
+    const response = await axios.post(effectiveConfig.apiUrl, xmlRequest, {
       headers: {
         'Content-Type': 'application/xml'
       }
@@ -883,7 +998,7 @@ app.post('/process-payment', async (req, res) => {
       success: isSuccess,
       authCode: parsedResponse.authCode,
       pasRef: parsedResponse.pasRef,
-      account: config.account,
+      account: effectiveConfig.account,
       userId: req.session && req.session.userId ? req.session.userId : null, // Link to logged-in user
       rawResponse: response.data  // Store raw XML response from gateway
     };
@@ -1300,10 +1415,14 @@ app.post('/store-card', async (req, res) => {
 app.post('/charge-stored-card', async (req, res) => {
   const { token, amount, currency } = req.body;
   
+  // Get effective config (session credentials override defaults)
+  const effectiveConfig = getEffectiveConfig(req);
+  
   console.log('\n=== Charging Stored Card ===');
   console.log('Token:', token);
   console.log('Amount:', amount);
   console.log('Currency:', currency);
+  console.log('Using Merchant ID:', effectiveConfig.merchantId);
   
   try {
     // Find the stored card
@@ -1335,14 +1454,14 @@ app.post('/charge-stored-card', async (req, res) => {
     const amountInCents = Math.round(amount * 100).toString();
     
     // Build signature for receipt-in request: timestamp.merchantid.orderid.amount.currency.payerref
-    const signature = `${timestamp}.${config.merchantId}.${orderId}.${amountInCents}.${currency}.${card.gpPayerRef}`;
+    const signature = `${timestamp}.${effectiveConfig.merchantId}.${orderId}.${amountInCents}.${currency}.${card.gpPayerRef}`;
     const hash1 = generateSha1Hash(signature);
-    const sha1hash = generateSha1Hash(`${hash1}.${config.sharedSecret}`);
+    const sha1hash = generateSha1Hash(`${hash1}.${effectiveConfig.sharedSecret}`);
     
     const xmlRequest = `<?xml version="1.0" encoding="UTF-8"?>
 <request type="receipt-in" timestamp="${timestamp}">
-  <merchantid>${config.merchantId}</merchantid>
-  <account>${config.account}</account>
+  <merchantid>${effectiveConfig.merchantId}</merchantid>
+  <account>${effectiveConfig.account}</account>
   <orderid>${orderId}</orderid>
   <amount currency="${currency}">${amountInCents}</amount>
   <payerref>${card.gpPayerRef}</payerref>
@@ -1355,7 +1474,7 @@ app.post('/charge-stored-card', async (req, res) => {
     console.log(xmlRequest);
     
     // Send request to Global Payments
-    const response = await axios.post(config.apiUrl, xmlRequest, {
+    const response = await axios.post(effectiveConfig.apiUrl, xmlRequest, {
       headers: {
         'Content-Type': 'application/xml'
       }
@@ -1397,7 +1516,7 @@ app.post('/charge-stored-card', async (req, res) => {
       success: isSuccess,
       authCode: parsedResponse.authCode,
       pasRef: parsedResponse.pasRef,
-      account: config.account,
+      account: effectiveConfig.account,
       userId: card.userId || null, // Link to user if available
       paymentMethod: 'stored-card',
       cardToken: token
@@ -1457,7 +1576,8 @@ app.delete('/stored-cards/:token', (req, res) => {
 // ========================================
 
 // Helper function to generate HPP signature
-function generateHppSignature(timestamp, merchantId, orderId, amount, currency) {
+function generateHppSignature(timestamp, merchantId, orderId, amount, currency, sharedSecret = null) {
+  const secret = sharedSecret || config.hppSharedSecret;
   // Step 1: timestamp.merchantid.orderid.amount.currency
   const step1 = `${timestamp}.${merchantId}.${orderId}.${amount}.${currency}`;
   console.log('HPP Signature Step 1:', step1);
@@ -1465,7 +1585,7 @@ function generateHppSignature(timestamp, merchantId, orderId, amount, currency) 
   console.log('HPP Hash 1:', hash1);
   
   // Step 2: hash1.secret
-  const step2 = `${hash1}.${config.hppSharedSecret}`;
+  const step2 = `${hash1}.${secret}`;
   const hash2 = generateSha1Hash(step2);
   console.log('HPP Final Hash:', hash2);
   
@@ -1473,11 +1593,12 @@ function generateHppSignature(timestamp, merchantId, orderId, amount, currency) 
 }
 
 // Helper function to verify HPP response signature
-function verifyHppResponseSignature(timestamp, merchantId, orderId, result, message, pasref, authcode) {
+function verifyHppResponseSignature(timestamp, merchantId, orderId, result, message, pasref, authcode, sharedSecret = null) {
+  const secret = sharedSecret || config.hppSharedSecret;
   const step1 = `${timestamp}.${merchantId}.${orderId}.${result}.${message}.${pasref}.${authcode}`;
   const hash1 = generateSha1Hash(step1);
   
-  const step2 = `${hash1}.${config.hppSharedSecret}`;
+  const step2 = `${hash1}.${secret}`;
   const hash2 = generateSha1Hash(step2);
   
   return hash2;
@@ -1505,13 +1626,17 @@ app.post('/generate-hpp-token', (req, res) => {
   // Convert amount to cents
   const amountInCents = Math.round(parseFloat(amount) * 100).toString();
   
+  // Get effective config (session credentials override defaults)
+  const effectiveConfig = getEffectiveConfig(req);
+  
   // Generate signature
   const signature = generateHppSignature(
     timestamp,
-    config.hppMerchantId,
+    effectiveConfig.hppMerchantId,
     orderId,
     amountInCents,
-    currency
+    currency,
+    effectiveConfig.hppSharedSecret
   );
   
   logger.logHppRequest({
@@ -1522,7 +1647,7 @@ app.post('/generate-hpp-token', (req, res) => {
   
   console.log('\n=== HPP Token Generation ===');
   console.log('Timestamp:', timestamp);
-  console.log('Merchant ID:', config.hppMerchantId);
+  console.log('Merchant ID:', effectiveConfig.hppMerchantId);
   console.log('Order ID:', orderId);
   console.log('Amount:', amountInCents);
   console.log('Currency:', currency);
@@ -1551,27 +1676,37 @@ app.post('/generate-hpp-token', (req, res) => {
   // Prepare HPP parameters - match exact structure of working HPP app
   const hppData = {
     TIMESTAMP: timestamp,
-    MERCHANT_ID: config.hppMerchantId,
-    ACCOUNT: config.hppAccount,
+    MERCHANT_ID: effectiveConfig.hppMerchantId,
+    ACCOUNT: effectiveConfig.hppAccount,
     ORDER_ID: orderId,
     AMOUNT: amountInCents,
     CURRENCY: currency,
     AUTO_SETTLE_FLAG: '1',
-    MERCHANT_RESPONSE_URL: config.hppResponseUrl,
+    MERCHANT_RESPONSE_URL: effectiveConfig.hppResponseUrl,
     HPP_VERSION: '2',
     SHA1HASH: signature,
     COMMENT1: comment1,
-    COMMENT2: ''
+    COMMENT2: '',
+    // Billing fields required when allow="payment" is set (for Apple Pay)
+    HPP_BILLING_STREET1: '123 Test Street',
+    HPP_BILLING_STREET2: '',
+    HPP_BILLING_STREET3: '',
+    HPP_BILLING_CITY: 'Dublin',
+    HPP_BILLING_POSTALCODE: 'D02 X285',
+    HPP_BILLING_COUNTRY: '372', // Ireland (ISO 3166-1 numeric)
+    HPP_BILLING_STATE: '',
+    HPP_CUSTOMER_EMAIL: 'customer@example.com',
+    HPP_CUSTOMER_PHONENUMBER_MOBILE: ''
   };
   
-  // Optional fields - only CUST_NUM if provided (not HPP_CUSTOMER_EMAIL for now)
+  // Optional fields - only CUST_NUM if provided
   if (cardHolderName) {
     hppData.CUST_NUM = cardHolderName;
   }
   
   res.json({
     success: true,
-    hppUrl: config.hppSandboxUrl,
+    hppUrl: effectiveConfig.hppSandboxUrl,
     hppData: hppData
   });
 });
@@ -1795,6 +1930,11 @@ app.get('/hpp-response', (req, res) => {
     </body>
     </html>
   `);
+});
+
+// Serve other HTML files from public directory
+app.get('/*.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', req.path));
 });
 
 // Start server
