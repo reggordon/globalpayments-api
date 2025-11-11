@@ -229,14 +229,9 @@ function findUserById(userId) {
 
 // Authentication middleware
 function requireAuth(req, res, next) {
-  console.log('requireAuth - Session:', req.session);
-  console.log('requireAuth - Session ID:', req.sessionID);
-  console.log('requireAuth - User ID:', req.session ? req.session.userId : 'NO SESSION');
-  
   if (req.session && req.session.userId) {
     next();
   } else {
-    console.log('requireAuth - REJECTED: No valid session');
     res.status(401).json({ success: false, message: 'Authentication required' });
   }
 }
@@ -1227,6 +1222,24 @@ app.get('/transactions', (req, res) => {
   }
 });
 
+// Route: Clear transaction history
+app.delete('/transactions', (req, res) => {
+  try {
+    fs.writeFileSync(TRANSACTIONS_FILE, JSON.stringify([], null, 2));
+    logger.info('Transaction history cleared');
+    res.json({
+      success: true,
+      message: 'Transaction history cleared successfully'
+    });
+  } catch (error) {
+    logger.error('Failed to clear transaction history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear transactions: ' + error.message
+    });
+  }
+});
+
 // Route: Get transaction stats
 app.get('/transactions/stats', (req, res) => {
   try {
@@ -1273,6 +1286,24 @@ app.get('/hpp-transactions', (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to load HPP transactions: ' + error.message
+    });
+  }
+});
+
+// Route: Clear HPP transaction history
+app.delete('/hpp-transactions', (req, res) => {
+  try {
+    fs.writeFileSync(HPP_TRANSACTIONS_FILE, JSON.stringify([], null, 2));
+    logger.info('HPP transaction history cleared');
+    res.json({
+      success: true,
+      message: 'HPP transaction history cleared successfully'
+    });
+  } catch (error) {
+    logger.error('Failed to clear HPP transaction history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to clear HPP transactions: ' + error.message
     });
   }
 });

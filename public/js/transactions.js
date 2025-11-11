@@ -217,6 +217,30 @@ function copyResponse() {
 }
 
 // Initialize on page load
+async function clearTransactions() {
+    if (!confirm('Are you sure you want to clear all transaction history? This cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/transactions', {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Transaction history cleared successfully');
+            loadStats();
+            loadTransactions();
+        } else {
+            alert('Failed to clear transaction history: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Error clearing transactions:', error);
+        alert('Error clearing transaction history');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     loadStats();
     loadTransactions();
