@@ -26,125 +26,26 @@
     </style>
 </head>
 <body>
-    <div id="profileLinkContainer"></div>
-    <div class="container">
-        <h1>Global Payments API</h1>
-        <p class="subtitle">Direct API Integration - Sandbox</p>
-
-        <nav class="nav-links">
-            <a href="/">🔑 Credentials</a>
-            <a href="/payment" style="font-weight: bold; text-decoration: underline;">💳 Direct Payment</a>
-            <a href="/hpp-options.html">🔐 HPP Options</a>
-            <a href="/transactions.html">📊 API Transactions</a>
-            <a href="/hpp-transactions.html">📊 HPP Transactions</a>
-            <a href="/stored-cards.html">💾 Stored Cards</a>
-        </nav>
-
-        <div class="info-box">
-            <strong>API Mode:</strong> This application uses direct server-to-server API integration with the Global Payments sandbox environment.
+    <div class="container home-options" style="max-width: 500px; margin: 40px auto;">
+        <h1 style="text-align:center;">Global Payments API</h1>
+        <p class="subtitle" style="text-align:center;">Welcome! Choose how you want to proceed:</p>
+        <div class="button-group" style="display: flex; flex-direction: column; gap: 20px; margin: 40px 0;">
+            <button onclick="window.location.href='/login.html'" class="btn btn-primary" style="font-size: 1.2em; padding: 16px;">🔑 Log In</button>
+            <button onclick="window.location.href='/payment'" class="btn btn-secondary" style="font-size: 1.2em; padding: 16px;">🚀 Proceed Without Logging In</button>
+            <button onclick="window.location.href='/credentials'" class="btn btn-tertiary" style="font-size: 1.2em; padding: 16px;">⚙️ Change Credentials</button>
         </div>
-
-        <form id="paymentForm">
-                    <div class="form-group">
-                        <label for="amount">Amount <span class="required">*</span></label>
-                        <input type="number" id="amount" name="amount" placeholder="10.00" step="0.01" min="0.01" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="currency">Currency <span class="required">*</span></label>
-                        <select id="currency" name="currency" required>
-                            <option value="EUR">EUR - Euro</option>
-                            <option value="USD">USD - US Dollar</option>
-                            <option value="GBP">GBP - British Pound</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="cardNumber">Card Number <span class="required">*</span></label>
-                        <input type="text" id="cardNumber" name="cardNumber" placeholder="4263970000005262" maxlength="16" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="cardHolderName">Cardholder Name <span class="required">*</span></label>
-                        <input type="text" id="cardHolderName" name="cardHolderName" placeholder="John Doe" required>
-                    </div>
-
-                    <div class="row">
-                        <div class="col">
-                            <div class="form-group">
-                                <label for="expiryMonth">Expiry Month <span class="required">*</span></label>
-                                <select id="expiryMonth" name="expiryMonth" required>
-                                    <option value="">MM</option>
-                                    <option value="01">01</option>
-                                    <option value="02">02</option>
-                                    <option value="03">03</option>
-                                    <option value="04">04</option>
-                                    <option value="05">05</option>
-                                    <option value="06">06</option>
-                                    <option value="07">07</option>
-                                    <option value="08">08</option>
-                                    <option value="09">09</option>
-                                    <option value="10">10</option>
-                                    <option value="11">11</option>
-                                    <option value="12">12</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="form-group">
-                                <label for="expiryYear">Expiry Year <span class="required">*</span></label>
-                                <select id="expiryYear" name="expiryYear" required>
-                                    <option value="">YY</option>
-                                    <option value="25">25</option>
-                                    <option value="26">26</option>
-                                    <option value="27">27</option>
-                                    <option value="28">28</option>
-                                    <option value="29">29</option>
-                                    <option value="30">30</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="form-group">
-                                <label for="cvv">CVV <span class="required">*</span></label>
-                                <input type="text" id="cvv" name="cvv" placeholder="123 (or 1234 for Amex)" maxlength="4" required>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-group" style="margin-top: 20px;">
-                        <label style="display: flex; align-items: center; cursor: pointer;">
-                            <input type="checkbox" id="saveCard" name="saveCard" style="margin-right: 10px; width: 18px; height: 18px; cursor: pointer;">
-                            <span>💾 Save this card for future payments</span>
-                        </label>
-                        <small style="color: #666; margin-left: 28px; display: block; margin-top: 5px;">
-                            Card will be securely stored for faster checkout
-                        </small>
-                    </div>
-
-                    <button type="submit" id="submitBtn">Process Payment</button>
-                </form>
-
-                <div class="loading" id="loading">
-                    <div class="spinner"></div>
-                    <p>Processing payment...</p>
-                </div>
-
-                <div class="result" id="result">
-                    <h3 id="resultTitle"></h3>
-                    <div class="result-details" id="resultDetails"></div>
-                </div>
-
-                <div class="test-cards">
-                    <h3>📝 Sample Test Cards</h3>
-                    <ul>
-                        <li><strong>Visa Success:</strong> 4263970000005262 (CVV: 123)</li>
-                        <li><strong>Visa Declined:</strong> 4000120000001154 (CVV: 123)</li>
-                        <li><strong>MC Success:</strong> 5425230000004415 (CVV: 123)</li>
-                        <li><strong>MC Declined:</strong> 5114610000004778 (CVV: 123)</li>
-                        <li><strong>Expiry:</strong> Any future date | <a href="/test-cards.html">View all cards →</a></li>
-                    </ul>
-                </div>
+        <div class="info-box" style="margin-top: 30px; text-align:center;">
+            <strong>Note:</strong> Log in to access saved cards and transaction history, or proceed as a guest for a quick payment. Credentials can be changed at any time.
+        </div>
+        <nav class="nav-links" style="margin-top: 40px; text-align:center;">
+            <a href="/" class="btn btn-tertiary" style="margin: 0 8px;">🏠 Home</a>
+            <a href="/credentials" class="btn btn-tertiary" style="margin: 0 8px;">🔑 Credentials</a>
+            <a href="/payment" class="btn btn-tertiary" style="margin: 0 8px;">💳 Direct Payment</a>
+            <a href="/hpp-options.html" class="btn btn-tertiary" style="margin: 0 8px;">🔐 HPP Options</a>
+            <a href="/transactions.html" class="btn btn-tertiary" style="margin: 0 8px;">📊 API Transactions</a>
+            <a href="/hpp-transactions.html" class="btn btn-tertiary" style="margin: 0 8px;">📊 HPP Transactions</a>
+            <a href="/stored-cards.html" class="btn btn-tertiary" style="margin: 0 8px;">💾 Stored Cards</a>
+        </nav>
     </div>
 
     <script src="/js/payment.js"></script>

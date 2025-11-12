@@ -13,9 +13,10 @@
             <p class="user-email" id="userEmail"></p>
             
             <div class="quick-actions">
-                <a href="/">💳 Make a Payment</a>
-                <a href="/transactions.html">📊 View Transactions</a>
-                <a href="/test-cards.html">🃏 Test Cards</a>
+                <a href="/" class="btn btn-tertiary">🏠 Home</a>
+                <a href="/payment" class="btn btn-primary">💳 Make a Payment</a>
+                <a href="/transactions.html" class="btn btn-secondary">📊 View Transactions</a>
+                <a href="/test-cards.html" class="btn btn-tertiary">🃏 Test Cards</a>
             </div>
             
             <button onclick="logout()" class="logout-btn">Sign Out</button>
@@ -116,7 +117,7 @@
                     <div class="no-transactions">
                         <p>No transactions yet</p>
                         <p class="no-transactions-link">
-                            <a href="/">Make your first payment</a>
+                            <button onclick="window.location.href='/payment'" class="btn btn-primary">Make your first payment</button>
                         </p>
                     </div>
                 `;

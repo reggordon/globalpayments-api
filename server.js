@@ -906,7 +906,18 @@ app.post('/api/credentials/reset', (req, res) => {
 // ==================== PAYMENT ROUTES ====================
 
 // Route: Home page - Credentials Management
+// Home page: landing options
 app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Payment page: payment form
+app.get('/payment', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'payment.html'));
+});
+
+// Credentials management page
+app.get('/credentials', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'credentials.html'));
 });
 
@@ -1201,12 +1212,14 @@ app.post('/refund', async (req, res) => {
 // Route: Get transaction history
 app.get('/transactions', (req, res) => {
   try {
-    const transactions = loadTransactions();
+    let transactions = loadTransactions();
+    // If user is logged in, filter by userId
+    if (req.session && req.session.userId) {
+      transactions = transactions.filter(t => t.userId === req.session.userId);
+    }
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
-    
     const paginatedTransactions = transactions.slice(offset, offset + limit);
-    
     res.json({
       success: true,
       total: transactions.length,
@@ -1269,12 +1282,14 @@ app.get('/transactions/stats', (req, res) => {
 // Route: Get HPP transactions
 app.get('/hpp-transactions', (req, res) => {
   try {
-    const transactions = loadHppTransactions();
+    let transactions = loadHppTransactions();
+    // If user is logged in, filter by userId
+    if (req.session && req.session.userId) {
+      transactions = transactions.filter(t => t.userId === req.session.userId);
+    }
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
-    
     const paginatedTransactions = transactions.slice(offset, offset + limit);
-    
     res.json({
       success: true,
       total: transactions.length,
