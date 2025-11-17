@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PaymentService.WebApp - Test</title>
+<script type="text/javascript"
+src="https://code.jquery.com/jquery-3.7.1.min.js"
+integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
+crossorigin="anonymous"></script>
+<script
+src="/js/ServerPostback.js?v=gDGBl0Vr3ithHQVQ4E6nBCYmXdQ7LHmo8oXXDIjXrO8"
+type="text/javascript"></script>
+<link rel="stylesheet"
+href="/css/site.css?v=7gUJ3909vNmFHlOE6CCQgSL9K54F8zrmPwvYPJenzyI" />
+</head>
+<body>
+<form id="paymentConfig" method="POST"
+action="https://pay.sandbox.realexpayments.com/pay" target="EBC2511141541562655">
+<input id="TIMESTAMP" type="hidden" name="TIMESTAMP" value="20251114154156" />
+<input id="MERCHANT_ID" type="hidden" name="MERCHANT_ID" value="racinstest" />
+<input id="ACCOUNT" type="hidden" name="ACCOUNT" value="65714831WWEBC3D" />
+<input id="ORDER_ID" type="hidden" name="ORDER_ID" value="EBC2511141541562655" />
+<input id="AMOUNT" type="hidden" name="AMOUNT" value="1000" />
+<input id="CURRENCY" type="hidden" name="CURRENCY" value="GBP" />
+<input id="SHA1HASH" type="hidden" name="SHA1HASH" value="5416d8dc9f6154a66e91dded5bb2b32b78b91d8a" />
+<input id="AUTO_SETTLE_FLAG" type="hidden" name="AUTO_SETTLE_FLAG" value="1" />
+<input id="HPP_VERSION" type="hidden" name="HPP_VERSION" value="2" />
+<input id="MERCHANT_RESPONSE_URL" type="hidden" name="MERCHANT_RESPONSE_URL" value="https://uat-securepay.rac.co.uk/payment/paymentresponsepostback" />
+<input id="HPP_CUSTOMER_FIRSTNAME" type="hidden" name="HPP_CUSTOMER_FIRSTNAME" value="CardHolderFirstName" />
+<input id="HPP_CUSTOMER_LASTNAME" type="hidden" name="HPP_CUSTOMER_LASTNAME" value="CardHolderLastName" />
+<input id="COMMENT1" type="hidden" name="COMMENT1" value="10.00" />
+<input id="HPP_DISPLAY_CARDHOLDERNAME" type="hidden" name="HPP_DISPLAY_CARDHOLDERNAME" value="FALSE" />
+<input id="CARD_STORAGE_ENABLE" type="hidden" name="CARD_STORAGE_ENABLE" value="1" />
+<input id="OFFER_SAVE_CARD" type="hidden" name="OFFER_SAVE_CARD" value="0" />
+<input id="PAYER_EXIST" type="hidden" name="PAYER_EXIST" value="0" />
+<input id="PAYER_REF" type="hidden" name="PAYER_REF" value="6a286c74-371e-428e-8675-6ab2e2decff3" />
+<input id="PMT_REF" type="hidden" name="PMT_REF" value="6a286c74-371e-428e-8675-6ab2e2decff3" />
+<input id="HPP_CUSTOMER_EMAIL" type="hidden" name="HPP_CUSTOMER_EMAIL" value="s@t.com" />
+<input id="HPP_CUSTOMER_PHONENUMBER_MOBILE" type="hidden" name="HPP_CUSTOMER_PHONENUMBER_MOBILE" value="44|3232323222" />
+<input id="HPP_BILLING_STREET1" type="hidden" name="HPP_BILLING_STREET1" value="R A C House" />
+<input id="HPP_BILLING_STREET2" type="hidden" name="HPP_BILLING_STREET2" value="Great Park Road" />
+<input id="HPP_BILLING_STREET3" type="hidden" name="HPP_BILLING_STREET3" value="Bradley Stoke" />
+<input id="HPP_BILLING_CITY" type="hidden" name="HPP_BILLING_CITY" value="Bristol" />
+<input id="HPP_BILLING_POSTALCODE" type="hidden" name="HPP_BILLING_POSTALCODE" value="BS32 4QN" />
+<input id="HPP_BILLING_COUNTRY" type="hidden" name="HPP_BILLING_COUNTRY" value="826" />
+<input id="HPP_ADDRESS_MATCH_INDICATOR" type="hidden" name="HPP_ADDRESS_MATCH_INDICATOR" value="TRUE" />
+<input id="HPP_CHALLENGE_REQUEST_INDICATOR" type="hidden" name="HPP_CHALLENGE_REQUEST_INDICATOR" value="NO_CHALLENGE_REQUESTED" />
+<input id="HPP_ENABLE_EXEMPTION_OPTIMIZATION" type="hidden" name="HPP_ENABLE_EXEMPTION_OPTIMIZATION" value="FALSE" />
+<input name="HPP_ENABLE_APPLEPAY" type="hidden" value="TRUE" />
+<input id="HPP_CHANNEL" name="HPP_CHANNEL" type="hidden" value="" />
+<input type="hidden" id="CARD_PAYMENT_BUTTON" name="CARD_PAYMENT_BUTTON" value="Pay now" />
+</form>
+<input name="apiKey" type="hidden" value="ezIcV7mSs5QPnK&#x2B;4rFlIJCFOneE/5x7zrujWxmrbbaCBTC5eSVr&#x2B;cUOuZ0IMdvjwEjMwz6jSWjv&#x2B;wcyPYofY0qWNJpD2c49fJaQt6uQgpGvKvWect/B6rz4Gw3qAPX1JID1/&#x2B;hnhmGeuh6ZLUvb/sw=="/>
+<script type="text/javascript">
+var preloadedIframe = false;
+function removeLoadingSpinner() {
+  if (preloadedIframe === false) {
+    preloadedIframe = true;
+    return;
+  }
+  const paymentIFrame = document.getElementById('EBC2511141541562655');
+  const loadingContainer = document.getElementById('paymentIframeLoading');
+  loadingContainer.style.display = "none";
+  paymentIFrame.style.opacity = 1;
+}
+</script>
+<div id="paymentIframeContainer" class="paymentIframeContainer">
+  <div class="paymentIframeLoading" id="paymentIframeLoading">
+    <h1 class="paymentIframeLoadingText">Please do not refresh this page</h1>
+    <img src="/images/loading-buffering.gif" alt="loading icon" class="paymentIframeLoadingImage" />
+  </div>
+  <iframe class="paymentIframe" allow="payment" id="EBC2511141541562655" name="EBC2511141541562655" allowtransparency="true" onload="removeLoadingSpinner()" src="about:blank"></iframe>
+</div>
+<script type="text/javascript">
+$(document).ready(function () {
+  document.getElementById('paymentConfig').submit();
+});
+</script>
+</body>
+</html>

@@ -555,6 +555,12 @@ function getCardBrand(cardNumber) {
   }
 }
 
+// Export helper functions for modular routes
+module.exports.requireAuth = requireAuth;
+module.exports.findUserById = findUserById;
+module.exports.loadTransactions = loadTransactions;
+module.exports.loadStoredCards = loadStoredCards;
+
 // Helper function to parse XML response
 function parseXmlResponse(xmlString) {
   const result = {};
@@ -728,80 +734,9 @@ app.post('/api/logout', (req, res) => {
   });
 });
 
-// Get current user
-app.get('/api/user', requireAuth, (req, res) => {
-  console.log('GET /api/user - Session ID:', req.sessionID);
-  console.log('GET /api/user - User ID from session:', req.session.userId);
-  
-  const user = findUserById(req.session.userId);
-  if (user) {
-    res.json({
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name
-      }
-    });
-  } else {
-    res.status(404).json({ success: false, message: 'User not found' });
-  }
-});
-
-// Get user's transactions
-app.get('/api/user/transactions', requireAuth, (req, res) => {
-  try {
-    const allTransactions = loadTransactions();
-    const userId = req.session.userId;
-    
-    // Filter transactions for this user
-    const userTransactions = allTransactions.filter(t => t.userId === userId);
-    
-    // Sort by timestamp (newest first) and limit to recent 50
-    const recentTransactions = userTransactions
-      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-      .slice(0, 50);
-    
-    res.json({
-      success: true,
-      transactions: recentTransactions
-    });
-  } catch (error) {
-    console.error('Error fetching user transactions:', error);
-    res.status(500).json({ success: false, message: 'Error fetching transactions' });
-  }
-});
-
-// Get user's saved cards
-app.get('/api/user/cards', requireAuth, (req, res) => {
-  try {
-    const allCards = loadStoredCards();
-    const userId = req.session.userId;
-    
-    // Filter cards for this user
-    const userCards = allCards
-      .filter(card => card.userId === userId)
-      .map(card => ({
-        token: card.token,
-        maskedCardNumber: card.maskedCardNumber,
-        cardBrand: card.cardBrand,
-        cardHolderName: card.cardHolderName,
-        expiryMonth: card.expiryMonth,
-        expiryYear: card.expiryYear,
-        createdAt: card.createdAt,
-        lastUsed: card.lastUsed,
-        storedInRealvault: card.storedInRealvault
-      }));
-    
-    res.json({
-      success: true,
-      cards: userCards
-    });
-  } catch (error) {
-    console.error('Error fetching user cards:', error);
-    res.status(500).json({ success: false, message: 'Error fetching cards' });
-  }
-});
+// Modularized user routes
+const userRouter = require('./routes/user');
+app.use('/api/user', userRouter);
 
 // ==================== CREDENTIAL MANAGEMENT ROUTES ====================
 
@@ -1742,7 +1677,9 @@ app.post('/generate-hpp-token', (req, res) => {
     HPP_BILLING_COUNTRY: '372', // Ireland (ISO 3166-1 numeric)
     HPP_BILLING_STATE: '',
     HPP_CUSTOMER_EMAIL: 'customer@example.com',
-    HPP_CUSTOMER_PHONENUMBER_MOBILE: ''
+    HPP_CUSTOMER_PHONENUMBER_MOBILE: '',
+    //HPP_ENABLE_GPAY: false,
+    //HPP_ENABLE_APPLEPAY:false
   };
   
   // Optional fields - only CUST_NUM if provided
