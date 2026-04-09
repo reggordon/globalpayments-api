@@ -8,16 +8,11 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir);
 }
 
-// Define log format
+// Define JSON log format
 const logFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
-  winston.format.printf(({ timestamp, level, message, stack }) => {
-    if (stack) {
-      return `${timestamp} [${level.toUpperCase()}]: ${message}\n${stack}`;
-    }
-    return `${timestamp} [${level.toUpperCase()}]: ${message}`;
-  })
+  winston.format.json()
 );
 
 // Create the logger
