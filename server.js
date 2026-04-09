@@ -1,16 +1,23 @@
+
+
+// Clear log files from previous sessions at startup (before logger is required)
+const fs = require('fs');
+const path = require('path');
+
 require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
-const fs = require('fs');
-const path = require('path');
 const logger = require('./logger');
 const bcrypt = require('bcrypt');
 const session = require('express-session');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
+
+
+// Clear log files from previous sessions at startup
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -1699,12 +1706,11 @@ app.post('/hpp-response', (req, res) => {
   console.log('\n\n========================================');
   console.log('🚨 HPP RESPONSE ENDPOINT HIT!');
   console.log('========================================');
-  logger.info('HPP POST response received', { body: req.body });
-  console.log('\n=== HPP Response Received ===');
-  console.log('Response Data:', req.body);
-  console.log('Request Headers:', req.headers);
-  console.log('Request IP:', req.ip);
-  console.log('========================================\n');
+  logger.info('HPP RESPONSE ENDPOINT HIT', {
+    body: req.body,
+    headers: req.headers,
+    ip: req.ip
+  });
   
   const {
     TIMESTAMP,
@@ -1739,7 +1745,6 @@ app.post('/hpp-response', (req, res) => {
     isValid = expectedSignature === SHA1HASH;
   }
   
-  console.log('Signature Valid:', isValid);
   logger.info('HPP signature validation', { isValid, result: RESULT });
   
   // Create raw response string for debugging
@@ -1764,16 +1769,31 @@ app.post('/hpp-response', (req, res) => {
     rawResponse: rawResponse
   };
   
-  console.log('Saving HPP transaction:', JSON.stringify(transaction, null, 2));
+  logger.info('Saving HPP transaction', transaction);
   saveHppTransaction(transaction); // Save to HPP-specific file
-  console.log('HPP Transaction saved to hpp-transactions.json');
   logger.info('HPP transaction saved', { orderId: ORDER_ID, success: transaction.success });
   
   // Log HPP response
   logger.logHppResponse({
     orderId: ORDER_ID,
     result: RESULT,
-    valid: isValid
+    valid: isValid,
+    body: req.body
+  });
+  // Utility endpoint to clear all log files (for development/ops use only)
+  app.post('/clear-logs', (req, res) => {
+    const logDir = path.join(__dirname, 'logs');
+    const files = ['combined.log', 'error.log', 'payments.log'];
+    let cleared = [];
+    files.forEach(file => {
+      const filePath = path.join(logDir, file);
+      if (fs.existsSync(filePath)) {
+        fs.truncateSync(filePath, 0);
+        cleared.push(file);
+      }
+    });
+    logger.info('Log files cleared', { files: cleared });
+    res.json({ success: true, cleared });
   });
   
   // Build result URL with parameters - only include defined values
@@ -1915,6 +1935,11 @@ app.get('/hpp-response', (req, res) => {
   `);
 });
 
+
+// Mount logs route for log viewing
+const logsRoute = require('./routes/logs');
+app.use('/logs', logsRoute);
+
 // Serve other HTML files from public directory
 app.get('/*.html', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', req.path));
@@ -1922,18 +1947,8 @@ app.get('/*.html', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  logger.info(`Global Payments API Server started on port ${PORT}`);
-  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`Log level: ${process.env.LOG_LEVEL || 'info'}`);
-  logger.info(`Configuration loaded from environment variables`);
-  
-  console.log(`Global Payments API Server running on http://localhost:${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Configuration loaded from environment variables`);
-  console.log(`  API Merchant ID: ${config.merchantId}`);
-  console.log(`  API Account: ${config.account}`);
-  console.log(`  HPP Merchant ID: ${config.hppMerchantId}`);
-  console.log(`  HPP Account: ${config.hppAccount}`);
-  console.log('\n⚠️  IMPORTANT: API credentials are different from HPP credentials!');
-  console.log('If you haven\'t registered for API access, contact Global Payments support.\n');
+  logger.info('Global Payments API Server started', { port: PORT });
+  logger.info('Environment', { env: process.env.NODE_ENV || 'development' });
+  logger.info('Log level', { level: logger.level });
+  logger.info('Configuration loaded from environment variables');
 });

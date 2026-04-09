@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Server Logs Viewer</title>
+  <style>
+    body { font-family: monospace; background: #181818; color: #e0e0e0; margin: 0; padding: 0; }
+    .container { max-width: 900px; margin: 40px auto; background: #232323; border-radius: 8px; box-shadow: 0 2px 8px #0008; padding: 24px; }
+    h1 { font-size: 1.5em; margin-bottom: 16px; }
+    #logContent { white-space: pre-wrap; background: #111; padding: 16px; border-radius: 6px; max-height: 600px; overflow-y: auto; font-size: 1em; }
+    .controls { margin-bottom: 16px; }
+    select, button { font-size: 1em; padding: 4px 8px; }
+    .search { margin-left: 16px; }
+    input[type="text"] { padding: 4px; font-size: 1em; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2 style="color:#ff79c6;">Log Viewer v2 (json-formatter-js)</h2>
+    <h1>Server Logs Viewer</h1>
+    <div class="controls">
+      <label for="logFile">Log file:</label>
+      <select id="logFile">
+        <option value="combined.log">combined.log</option>
+        <option value="error.log">error.log</option>
+        <option value="payments.log">payments.log</option>
+      </select>
+      <button onclick="loadLog()">Load</button>
+      <span class="search">
+        <label for="search">Search:</label>
+        <input type="text" id="search" placeholder="Type to filter..." oninput="filterLog()">
+      </span>
+    </div>
+    <div id="logContent">Loading...</div>
+    <div id="viewerStatus" style="color:#f1fa8c; margin-top:10px;"></div>
+  </div>
+  <!-- json-formatter-js from CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/json-formatter-js@2.3.4/dist/json-formatter.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/json-formatter-js@2.3.4/dist/json-formatter.umd.min.js"></script>
+  <script>
+    function prettifyLogLines(text) {
+      let anyJson = false;
+      const html = text.split('\n').map(line => {
+        try {
+          const obj = JSON.parse(line);
+          anyJson = true;
+          const formatter = new JSONFormatter(obj, 2, { theme: 'dark' });
+          const wrapper = document.createElement('div');
+          wrapper.className = 'json-line';
+          wrapper.appendChild(formatter.render());
+          return wrapper.outerHTML;
+        } catch {
+          return '<div>' + line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>';
+        }
+      }).join('');
+      document.getElementById('viewerStatus').textContent = anyJson ? 'JSON viewer active.' : 'No JSON detected or viewer failed.';
+      return html;
+    }
+
+    function loadLog() {
+      const file = document.getElementById('logFile').value;
+      fetch(`/logs?file=${encodeURIComponent(file)}`)
+        .then(res => res.ok ? res.text() : Promise.reject('Failed to load log'))
+        .then(text => {
+          document.getElementById('logContent').innerHTML = prettifyLogLines(text);
+          filterLog();
+        })
+        .catch(err => {
+          document.getElementById('logContent').textContent = err;
+        });
+    }
+
+    function filterLog() {
+      const search = document.getElementById('search').value.toLowerCase();
+      const lines = Array.from(document.querySelectorAll('#logContent .json-line, #logContent div'));
+      lines.forEach(line => {
+        if (!search || line.innerText.toLowerCase().includes(search)) {
+          line.style.display = '';
+        } else {
+          line.style.display = 'none';
+        }
+      });
+    }
+
+    // Initial load
+    loadLog();
+  </script>
+</body>
+</html>
