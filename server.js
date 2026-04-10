@@ -1617,6 +1617,10 @@ app.post('/generate-hpp-token', (req, res) => {
   // Get effective config (session credentials override defaults)
   const effectiveConfig = getEffectiveConfig(req);
   
+  // Log the HPP response URL being used
+  console.log('HPP_RESPONSE_URL used for this token:', effectiveConfig.hppResponseUrl);
+  logger.info('HPP_RESPONSE_URL used for this token', { hppResponseUrl: effectiveConfig.hppResponseUrl });
+
   // Generate signature
   const signature = generateHppSignature(
     timestamp,
